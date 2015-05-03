@@ -34,7 +34,7 @@ public class BaseZsetSegmentRedisDaoImpl implements IBaseZsetRedisDao {
 	/**
 	 * 第一个分片元素大小
 	 */
-	private int SEGMENT_INITIAL_SIZE = 10;
+	private int SEGMENT_INITIAL_SIZE = 10000;
 	
 	public BaseZsetSegmentRedisDaoImpl(String baseKey, int segmentSize){
 		this.SEGMENT_SIZE = segmentSize;
