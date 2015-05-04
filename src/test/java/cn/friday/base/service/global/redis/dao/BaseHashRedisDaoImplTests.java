@@ -26,11 +26,13 @@ public class BaseHashRedisDaoImplTests {
 	
 	@Test
 	public void mitlFind(){
-		List<Long> list = new ArrayList<Long>();
-		list.add(11760L);
-		list.add(10733L);
-		list.add(11330L);
-		List<TreeholeMessageRedis> t = treeholeMessageRedisDao.multiFindByIds(list);
+//		List<Long> list = new ArrayList<Long>();
+//		list.add(11760L);
+//		list.add(10733L);
+//		list.add(11330L);
+//		List<TreeholeMessageRedis> t = treeholeMessageRedisDao.multiFindByIds(list);
+		
+		TreeholeMessageRedis t = treeholeMessageRedisDao.findById(11760L);
 		System.out.println(t);
 	}
 

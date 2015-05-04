@@ -14,9 +14,8 @@ import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 import cn.friday.base.service.global.redis.dao.IBaseHashRedisDao;
-import cn.friday.base.service.global.redis.mapper.IBaseRedisMapper;
 
-public class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T> {
+public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T> {
 	
 	@Resource
 	StringRedisTemplate stringRedisTemplate; 
@@ -24,22 +23,18 @@ public class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T> {
 	private Class<T> entityClazz;
 	
 	private String baseKey;
-	@Resource
-	IBaseRedisMapper<T> baseRedisMapper;
 	
 	public BaseHashRedisDaoImpl(Class<T> entityClazz) {
 		this.entityClazz = entityClazz;
 		buildKey();
 	}
 
-
-
 	@Override
 	public T findById(long id) {
 		String key = MessageFormat.format(baseKey, id + "");
 		Map<Object, Object> entityMap = stringRedisTemplate.opsForHash().entries(key);
 		entityMap.put("id", id);
-		return baseRedisMapper.fromObjectHash(entityMap);
+		return getBaseRedisMapper().fromObjectHash(entityMap);
 	}
 	
 	/**
@@ -60,7 +55,7 @@ public class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T> {
 					Map<String,String> map = stringRedisConn.hGetAll(key);
 					System.out.println(map);
 					map.put("id", id+"");
-					list.add(baseRedisMapper.fromHash(map));
+					list.add(getBaseRedisMapper().fromHash(map));
 				}
 				return list;
 			}
@@ -84,7 +79,7 @@ public class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T> {
 		//生成id
 		String keyName =  createKeyName();
 		long id = makeId(keyName);
-		Map<String, String> map = baseRedisMapper.toHash(t);
+		Map<String, String> map = getBaseRedisMapper().toHash(t);
 		String key = MessageFormat.format(baseKey, id + "");
 		stringRedisTemplate.opsForHash().putAll(key, map);
 		return id;
@@ -98,7 +93,7 @@ public class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T> {
 	 * @return
 	 */
 	public long save(T t, long id){
-		Map<String, String> map = baseRedisMapper.toHash(t);
+		Map<String, String> map = getBaseRedisMapper().toHash(t);
 		String key = MessageFormat.format(baseKey, id + "");
 		stringRedisTemplate.opsForHash().putAll(key, map);
 		return id;
@@ -148,14 +143,13 @@ public class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T> {
 		String key = MessageFormat.format(baseKey, id + "");
 		stringRedisTemplate.opsForHash().putAll(key, map);
 		return id;
-	}
+	} 
 	
 	private String createKeyName(){
 		String entityClazzName = entityClazz.getSimpleName();
 		String keyName = entityClazzName.substring(0,entityClazzName.lastIndexOf("Redis"));
 		return keyName;
 	}
-	
 	
 	private long makeId(String key){
 		long id = stringRedisTemplate.getConnectionFactory().getConnection().incr(key.getBytes());

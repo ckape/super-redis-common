@@ -26,21 +26,16 @@ public class BaseRedisMapper<T> extends BeanUtilsHashMapper<T> implements IBaseR
 	}
 	
 	public T fromObjectHash(Map<Object, Object> hash) {
-		
 		Map<String,String> map = new HashMap<String, String>();
-		
 		for(Object key:hash.keySet()){
 			String keyStr = key.toString();
 			String valueStr = hash.get(key).toString();
 			if(keyStr.startsWith("is") && ( ("true").equals(valueStr) || ("false").equals(valueStr)) ){
 				keyStr = keyStr.substring(2);
 				keyStr = keyStr.substring(0, 1).toLowerCase()+keyStr.substring(1, keyStr.length());
-			
 			}
-			
 			map.put(keyStr, valueStr);
 		}
-		
 		return super.fromHash(map);
 	}
 	

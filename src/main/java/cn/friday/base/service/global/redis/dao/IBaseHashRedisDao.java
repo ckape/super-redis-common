@@ -3,6 +3,8 @@ package cn.friday.base.service.global.redis.dao;
 import java.util.List;
 import java.util.Map;
 
+import cn.friday.base.service.global.redis.mapper.IBaseRedisMapper;
+
 
 public interface IBaseHashRedisDao<T> {
 	
@@ -26,5 +28,7 @@ public interface IBaseHashRedisDao<T> {
 	public  long updateByProperty(String propertyName, Object value, long id) ;
 	
 	public long updateByMap( Map<String, String> map, long id);
+	
+	public IBaseRedisMapper<T> getBaseRedisMapper();
 
 }
