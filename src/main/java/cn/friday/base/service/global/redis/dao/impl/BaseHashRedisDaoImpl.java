@@ -4,6 +4,7 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import javax.annotation.Resource;
 
@@ -84,6 +85,18 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T> {
 		stringRedisTemplate.opsForHash().putAll(key, map);
 		return id;
 	}
+	/**
+	 * 保存实体，
+	 * @param t
+	 * @param expireTime 过期时间
+	 * @return
+	 */
+	public long save(T t, int expireTime){
+		long id = save(t);
+		String key = MessageFormat.format(baseKey, id + "");
+		stringRedisTemplate.expire(key, expireTime, TimeUnit.SECONDS);
+		return id;
+	}
 	
 	/**
 	 * 保存一个有id的对象
@@ -97,6 +110,20 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T> {
 		String key = MessageFormat.format(baseKey, id + "");
 		stringRedisTemplate.opsForHash().putAll(key, map);
 		return id;
+	}
+	
+	/**
+	 * 保存实体
+	 * @param t
+	 * @param id
+	 * @param expireTime 过期时间
+	 * @return
+	 */
+	public long save(T t, long id,int expireTime){
+	      save(t, id);
+	      String key = MessageFormat.format(baseKey, id + "");  
+	      stringRedisTemplate.expire(key, expireTime, TimeUnit.SECONDS);
+	      return id;
 	}
 	
 	/**
@@ -129,7 +156,7 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T> {
 	 */
 	public  long updateByProperty(String propertyName, Object value, long id) {
 		String key = MessageFormat.format(baseKey, id + "");
-		stringRedisTemplate.opsForHash().put(key, propertyName, value);
+		stringRedisTemplate.opsForHash().put(key, propertyName, String.valueOf(value));
 		return id;
 	}
 	

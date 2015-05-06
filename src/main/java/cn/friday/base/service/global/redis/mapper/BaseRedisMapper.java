@@ -3,6 +3,7 @@ package cn.friday.base.service.global.redis.mapper;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.commons.beanutils.ConvertUtils;
 import org.springframework.data.redis.hash.BeanUtilsHashMapper;
@@ -26,6 +27,9 @@ public class BaseRedisMapper<T> extends BeanUtilsHashMapper<T> implements IBaseR
 	}
 	
 	public T fromObjectHash(Map<Object, Object> hash) {
+		if(hash.size() < 2){
+			return null;
+		}
 		Map<String,String> map = new HashMap<String, String>();
 		for(Object key:hash.keySet()){
 			String keyStr = key.toString();
@@ -40,6 +44,11 @@ public class BaseRedisMapper<T> extends BeanUtilsHashMapper<T> implements IBaseR
 	}
 	
 	public T fromHash(Map<String, String> hash) {
+		
+		if(hash.size() < 2){
+			return null;
+		}
+		
 		Map<String,String> map = new HashMap<String, String>();
 		for(String key:hash.keySet()){
 			String value = hash.get(key);
@@ -53,7 +62,15 @@ public class BaseRedisMapper<T> extends BeanUtilsHashMapper<T> implements IBaseR
 	}
 	
 	public Map<String, String> toHash(T object){
-		return super.toHash(object);
+		Map<String, String> map = super.toHash(object);
+		Map<String,String> targetMap = new HashMap<String, String>();
+		for(String key:map.keySet()){
+			String value = map.get(key) ;
+			if(value != null){
+				targetMap.put(key, value);
+			}
+		}
+		return targetMap;
 	}
 	
 	

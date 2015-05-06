@@ -34,7 +34,7 @@ public class BaseZsetSegmentRedisDaoImpl implements IBaseZsetRedisDao {
 	/**
 	 * 第一个分片元素大小
 	 */
-	private int SEGMENT_INITIAL_SIZE = 10000;
+	private int SEGMENT_INITIAL_SIZE = 100;
 	
 	public BaseZsetSegmentRedisDaoImpl(String baseKey, int segmentSize){
 		this.SEGMENT_SIZE = segmentSize;
@@ -298,7 +298,9 @@ public class BaseZsetSegmentRedisDaoImpl implements IBaseZsetRedisDao {
 				stringRedisTemplate.opsForZSet().remove(segmentKey, member);
 				//移动元素
 				long currSegmentSize = getSegmentElementSize(segmentKey);
-				forwardMoveSegment(i, (int)( getSegmentSize(i) - currSegmentSize ), segmentKey, ids);
+				if(getSegmentSize(i) - currSegmentSize  > 0){
+					forwardMoveSegment(i, (int)( getSegmentSize(i) - currSegmentSize ), segmentKey, ids);
+				}
 			}
 		}
 		return true;

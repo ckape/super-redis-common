@@ -19,7 +19,24 @@ public interface IBaseHashRedisDao<T> {
 	
 	public long save(T t);
 	
+	/**
+	 * 保存实体，
+	 * @param t
+	 * @param expireTime 过期时间
+	 * @return
+	 */
+	public long save(T t, int expireTime);
+	
 	public long save(T t, long id);
+	
+	/**
+	 * 保存实体
+	 * @param t
+	 * @param id
+	 * @param expireTime 过期时间
+	 * @return
+	 */
+	public long save(T t, long id,int expireTime);
 	
 	public boolean exists(long id);
 	
