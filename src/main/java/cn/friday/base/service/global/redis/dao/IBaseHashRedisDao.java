@@ -46,6 +46,15 @@ public interface IBaseHashRedisDao<T> {
 	
 	public long updateByMap( Map<String, String> map, long id);
 	
+	/**
+	 * 增加某一个field的值
+	 * @param haskField
+	 * @param delta 负数表示减
+	 * @param id
+	 * @return
+	 */
+	public boolean increment(String haskField,long delta, long id);
+	
 	public IBaseRedisMapper<T> getBaseRedisMapper();
 
 }

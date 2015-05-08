@@ -172,6 +172,18 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T> {
 		return id;
 	} 
 	
+	/**
+	 * 增加某一个field的值
+	 * @param haskField
+	 * @param delta 负数表示减
+	 * @param id
+	 * @return
+	 */
+	public boolean increment(String haskField,long delta, long id){
+		String key = MessageFormat.format(baseKey, id + "");
+		return stringRedisTemplate.opsForHash().increment(key, haskField, delta) > 0 ? true : false;
+	}
+	
 	private String createKeyName(){
 		String entityClazzName = entityClazz.getSimpleName();
 		String keyName = entityClazzName.substring(0,entityClazzName.lastIndexOf("Redis"));
