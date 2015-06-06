@@ -6,9 +6,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-import javax.annotation.Resource;
-
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations.TypedTuple;
 
 import com.google.common.base.Joiner;
@@ -16,13 +13,11 @@ import com.google.common.base.Preconditions;
 
 import cn.friday.base.service.global.redis.bo.ZsetResult;
 import cn.friday.base.service.global.redis.dao.IBaseZsetRedisDao;
+import cn.friday.base.service.global.redis.dao.IRedisOpsTemplate;
 
-public class BaseZsetSegmentRedisDaoImpl implements IBaseZsetRedisDao {
+public abstract class BaseZsetSegmentRedisDaoImpl implements IBaseZsetRedisDao,IRedisOpsTemplate {
 	
 	private String baseKey;
-	
-	@Resource
-	StringRedisTemplate stringRedisTemplate; 
 	/**
 	 * 多少个分片
 	 */
@@ -34,7 +29,7 @@ public class BaseZsetSegmentRedisDaoImpl implements IBaseZsetRedisDao {
 	/**
 	 * 第一个分片元素大小
 	 */
-	private int SEGMENT_INITIAL_SIZE = 100;
+	private int SEGMENT_INITIAL_SIZE = 10000;
 	
 	public BaseZsetSegmentRedisDaoImpl(String baseKey, int segmentSize){
 		this.SEGMENT_SIZE = segmentSize;
@@ -56,17 +51,17 @@ public class BaseZsetSegmentRedisDaoImpl implements IBaseZsetRedisDao {
 				//将元素添加到里面
 				if(segmentIndex == -1){
 					//加入到当前分片，将包含最后一个分片的数据都向后移动
-					stringRedisTemplate.opsForZSet().add(segmentKey, member, score);
+					stringRedisTemplate().opsForZSet().add(segmentKey, member, score);
 				}else if(segmentIndex == i){
-					stringRedisTemplate.opsForZSet().add(segmentKey, member, score);
+					stringRedisTemplate().opsForZSet().add(segmentKey, member, score);
 				}else if(segmentIndex < i){
-					stringRedisTemplate.opsForZSet().add(segmentKey, member, score);
+					stringRedisTemplate().opsForZSet().add(segmentKey, member, score);
 					//在大的分值处移走对应的member
 					remove(member, ids);
 				}else if(segmentIndex > i){
 					//加入到当前分片，将包含最后一个分片的数据都向后移动
-					stringRedisTemplate.opsForZSet().add(segmentKey, member, score);
-					stringRedisTemplate.opsForZSet().remove(buildKey(segmentIndex, ids), member);
+					stringRedisTemplate().opsForZSet().add(segmentKey, member, score);
+					stringRedisTemplate().opsForZSet().remove(buildKey(segmentIndex, ids), member);
 					afterMoveSegment(i, maxSegmentSize, segmentKey,ids);
 				}
 				
@@ -77,18 +72,18 @@ public class BaseZsetSegmentRedisDaoImpl implements IBaseZsetRedisDao {
 					if(zsetResult.getScore() < score){
 						if(segmentIndex == -1){
 							//加入到当前分片，将包含最后一个分片的数据都向后移动
-							stringRedisTemplate.opsForZSet().add(segmentKey, member, score);
+							stringRedisTemplate().opsForZSet().add(segmentKey, member, score);
 							afterMoveSegment(i, maxSegmentSize, segmentKey,ids);
 						}else if(segmentIndex == i){
-							stringRedisTemplate.opsForZSet().add(segmentKey, member, score);
+							stringRedisTemplate().opsForZSet().add(segmentKey, member, score);
 						}else if(segmentIndex < i){
-							stringRedisTemplate.opsForZSet().add(segmentKey, member, score);
+							stringRedisTemplate().opsForZSet().add(segmentKey, member, score);
 							//在大的分值处移走对应的member
 							remove(member, ids);
 						}else if(segmentIndex > i){
 							//加入到当前分片，将包含最后一个分片的数据都向后移动
-							stringRedisTemplate.opsForZSet().add(segmentKey, member, score);
-							stringRedisTemplate.opsForZSet().remove(buildKey(segmentIndex, ids), member);
+							stringRedisTemplate().opsForZSet().add(segmentKey, member, score);
+							stringRedisTemplate().opsForZSet().remove(buildKey(segmentIndex, ids), member);
 							afterMoveSegment(i, maxSegmentSize, segmentKey,ids);
 						}
 						break;
@@ -98,6 +93,15 @@ public class BaseZsetSegmentRedisDaoImpl implements IBaseZsetRedisDao {
 			}
 		}
 		return true;
+	}
+	/**
+	 * 增加多个成员
+	 * @param tuples
+	 * @param ids
+	 * @return
+	 */
+	public boolean add(Set<TypedTuple<String>> tuples, int ... ids){
+		return false;
 	}
 	
 	/**
@@ -136,7 +140,7 @@ public class BaseZsetSegmentRedisDaoImpl implements IBaseZsetRedisDao {
 				if(zsetResult.getScore() == 0){
 					break;
 				}
-				Set<String> set = stringRedisTemplate.opsForZSet().reverseRangeByScore(segmentKey, min, max);
+				Set<String> set = stringRedisTemplate().opsForZSet().reverseRangeByScore(segmentKey, min, max);
 				result.addAll(set);
 				if(  min >= zsetResult.getScore()){
 					break;
@@ -161,7 +165,7 @@ public class BaseZsetSegmentRedisDaoImpl implements IBaseZsetRedisDao {
 				if(zsetResult.getScore() == 0){
 					break;
 				}
-				Set<String> set = stringRedisTemplate.opsForZSet().reverseRangeByScore(segmentKey, min, max, offset, count);
+				Set<String> set = stringRedisTemplate().opsForZSet().reverseRangeByScore(segmentKey, min, max, offset, count);
 				result.addAll(set);
 				if(  min >= zsetResult.getScore()){
 					break;
@@ -192,7 +196,7 @@ public class BaseZsetSegmentRedisDaoImpl implements IBaseZsetRedisDao {
 			 if(segmentElementSize == 0){
 				 break;
 			 }
-			 Set<String> set = stringRedisTemplate.opsForZSet().range(segmentKey, start-segmentSize, end);
+			 Set<String> set = stringRedisTemplate().opsForZSet().range(segmentKey, start-segmentSize, end);
 			 if(set != null && set.size() > 0){
 				 result.addAll(set);
 			 }
@@ -278,7 +282,7 @@ public class BaseZsetSegmentRedisDaoImpl implements IBaseZsetRedisDao {
 			if(zsetResult.getScore() <= 0){
 				break;
 			}
-			total += stringRedisTemplate.opsForZSet().count(segmentKey, min, max);
+			total += stringRedisTemplate().opsForZSet().count(segmentKey, min, max);
 			
 			if(  min > zsetResult.getScore()){
 				break;
@@ -295,7 +299,7 @@ public class BaseZsetSegmentRedisDaoImpl implements IBaseZsetRedisDao {
 			double score = score(segmentKey, member) ;
 			if(score > 0){
 				//移除对应的元素，并将后面的元素向前移动
-				stringRedisTemplate.opsForZSet().remove(segmentKey, member);
+				stringRedisTemplate().opsForZSet().remove(segmentKey, member);
 				//移动元素
 				long currSegmentSize = getSegmentElementSize(segmentKey);
 				if(getSegmentSize(i) - currSegmentSize  > 0){
@@ -332,8 +336,8 @@ public class BaseZsetSegmentRedisDaoImpl implements IBaseZsetRedisDao {
 			//将多余的元素加入到下一个分片中
 			String nextSegmentKey = buildKey(index+1,ids);
 			for(ZsetResult zr:surplusElements){
-				stringRedisTemplate.opsForZSet().add(nextSegmentKey, zr.getValue(), zr.getScore());
-				stringRedisTemplate.opsForZSet().remove(segmentKey, zr.getValue());
+				stringRedisTemplate().opsForZSet().add(nextSegmentKey, zr.getValue(), zr.getScore());
+				stringRedisTemplate().opsForZSet().remove(segmentKey, zr.getValue());
 			}
 			long nextSegmentElementSize = getSegmentElementSize(nextSegmentKey);
 			long nextSegmentSize = getSegmentSize(index+1);
@@ -346,7 +350,7 @@ public class BaseZsetSegmentRedisDaoImpl implements IBaseZsetRedisDao {
 	
 	
 	private double score(String segmentKey,String member){
-		Double score = stringRedisTemplate.opsForZSet().score(segmentKey, member);
+		Double score = stringRedisTemplate().opsForZSet().score(segmentKey, member);
 		if(score == null){
 			return 0;
 		}
@@ -365,17 +369,17 @@ public class BaseZsetSegmentRedisDaoImpl implements IBaseZsetRedisDao {
 		Preconditions.checkArgument(moveElementNum > 0, "moveElementNum need > 0");
 		if(index < SEGMENT_SIZE -1){
 			String nextSegmentKey = buildKey(index+1, ids);
-			long nextSegmentSize = stringRedisTemplate.opsForZSet().size(nextSegmentKey);
+			long nextSegmentSize = stringRedisTemplate().opsForZSet().size(nextSegmentKey);
 			if(nextSegmentSize > 0){
 				//需要移动数据
-				Set<String> members = stringRedisTemplate.opsForZSet().reverseRange(nextSegmentKey, 0, moveElementNum-1);
+				Set<String> members = stringRedisTemplate().opsForZSet().reverseRange(nextSegmentKey, 0, moveElementNum-1);
 				Preconditions.checkNotNull(members, "没可向前一个分片移动的数据");
 				String currSegmentKey = buildKey(index, ids);
 				for(String member:members){
 					Double score = score(nextSegmentKey, member);
-					stringRedisTemplate.opsForZSet().add(currSegmentKey, member, score);
+					stringRedisTemplate().opsForZSet().add(currSegmentKey, member, score);
 					//移除
-					stringRedisTemplate.opsForZSet().remove(nextSegmentKey, member);
+					stringRedisTemplate().opsForZSet().remove(nextSegmentKey, member);
 				}
 				//递归调用移动下一个
 				forwardMoveSegment(index+1, moveElementNum, nextSegmentKey, ids);
@@ -392,7 +396,7 @@ public class BaseZsetSegmentRedisDaoImpl implements IBaseZsetRedisDao {
 	 */
 	private List<ZsetResult> findSurplusElementsWithScoresDesc(double min,double max, String segmentKey ){
 		List<ZsetResult> zsetResults = new ArrayList<ZsetResult>();
-		Set<TypedTuple<String>> results = stringRedisTemplate.opsForZSet().reverseRangeByScoreWithScores(segmentKey, min, max);
+		Set<TypedTuple<String>> results = stringRedisTemplate().opsForZSet().reverseRangeByScoreWithScores(segmentKey, min, max);
 		for(TypedTuple<String>  tt: results){
 			zsetResults.add(new ZsetResult(tt.getValue(), tt.getScore()));
 		}
@@ -407,7 +411,7 @@ public class BaseZsetSegmentRedisDaoImpl implements IBaseZsetRedisDao {
 	 * @return
 	 */
 	private ZsetResult getSegmentLastElement(String segmentKey,int maxSegmentSize){
-		Set<String> set = stringRedisTemplate.opsForZSet().reverseRange(segmentKey, maxSegmentSize-1, maxSegmentSize-1);
+		Set<String> set = stringRedisTemplate().opsForZSet().reverseRange(segmentKey, maxSegmentSize-1, maxSegmentSize-1);
 		Preconditions.checkNotNull(set, "找不到最后一个分片数据");
 		String member = "";
 		for(String str:set){
@@ -424,7 +428,7 @@ public class BaseZsetSegmentRedisDaoImpl implements IBaseZsetRedisDao {
 	 * @return
 	 */
 	private long getSegmentElementSize(String segmentKey){
-		return stringRedisTemplate.opsForZSet().size(segmentKey);
+		return stringRedisTemplate().opsForZSet().size(segmentKey);
 	}
 	
 	/**

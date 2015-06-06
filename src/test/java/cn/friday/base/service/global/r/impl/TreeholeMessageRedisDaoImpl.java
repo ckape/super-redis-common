@@ -2,6 +2,7 @@ package cn.friday.base.service.global.r.impl;
 
 import javax.annotation.Resource;
 
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import cn.friday.base.service.global.r.ITreeholeMessageRedisDao;
@@ -15,6 +16,9 @@ public class TreeholeMessageRedisDaoImpl extends BaseHashRedisDaoImpl<TreeholeMe
 	
 	@Resource
 	TreeholeMessageRedisMapper treeholeMessageRedisMapper;
+	
+	@Resource(name="stringRedisTemplate1")
+	private StringRedisTemplate stringRedisTemplate1;
 
 	public TreeholeMessageRedisDaoImpl() {
 		super(TreeholeMessageRedis.class);
@@ -23,6 +27,11 @@ public class TreeholeMessageRedisDaoImpl extends BaseHashRedisDaoImpl<TreeholeMe
 	@Override
 	public IBaseRedisMapper<TreeholeMessageRedis> getBaseRedisMapper() {
 		return treeholeMessageRedisMapper;
+	}
+
+	@Override
+	public StringRedisTemplate stringRedisTemplate() {
+		return stringRedisTemplate1;
 	}
 
 }

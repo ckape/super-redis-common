@@ -3,6 +3,8 @@ package cn.friday.base.service.global.redis.dao;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.data.redis.core.StringRedisTemplate;
+
 import cn.friday.base.service.global.redis.mapper.IBaseRedisMapper;
 
 

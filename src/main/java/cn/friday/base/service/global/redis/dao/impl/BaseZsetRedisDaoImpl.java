@@ -4,22 +4,19 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import javax.annotation.Resource;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations.TypedTuple;
 import com.google.common.base.Joiner;
 import cn.friday.base.service.global.redis.bo.ZsetResult;
 import cn.friday.base.service.global.redis.dao.IBaseZsetRedisDao;
+import cn.friday.base.service.global.redis.dao.IRedisOpsTemplate;
 
 /**
  * @author Zz
  */
-public class BaseZsetRedisDaoImpl implements IBaseZsetRedisDao {
+public abstract class BaseZsetRedisDaoImpl implements IBaseZsetRedisDao,IRedisOpsTemplate {
 	
 	private String baseKey;
-	
-	@Resource
-	StringRedisTemplate stringRedisTemplate; 
 	
 	public BaseZsetRedisDaoImpl(String baseKey){
 		this.baseKey = baseKey+":{0}";
@@ -34,7 +31,18 @@ public class BaseZsetRedisDaoImpl implements IBaseZsetRedisDao {
 	 */
 	public boolean add( String member,  double score,int ... ids) {
 		String key = buildKey(ids);
-		return stringRedisTemplate.opsForZSet().add(key, member, score);
+		return stringRedisTemplate().opsForZSet().add(key, member, score);
+	}
+	
+	/**
+	 * 增加多个成员
+	 * @param tuples
+	 * @param ids
+	 * @return
+	 */
+	public boolean add(Set<TypedTuple<String>> tuples, int ... ids){
+		String key = buildKey(ids);
+		return stringRedisTemplate().opsForZSet().add(key, tuples) > 0 ? true : false;
 	}
 	
 	/**
@@ -46,7 +54,7 @@ public class BaseZsetRedisDaoImpl implements IBaseZsetRedisDao {
 	 */
 	public double incrScore(String member, double delta, int ... ids){
 		String key = buildKey(ids);
-		return stringRedisTemplate.opsForZSet().incrementScore(key, member, delta);
+		return stringRedisTemplate().opsForZSet().incrementScore(key, member, delta);
 	} 
 	
 	/**
@@ -58,7 +66,7 @@ public class BaseZsetRedisDaoImpl implements IBaseZsetRedisDao {
 	 */
 	public Set<String> findByScoreAsc(double min,double max,int ... ids){
 		String key = buildKey(ids);
-		return stringRedisTemplate.opsForZSet().rangeByScore(key, min, max);
+		return stringRedisTemplate().opsForZSet().rangeByScore(key, min, max);
 	}
 	
 	/**
@@ -70,7 +78,7 @@ public class BaseZsetRedisDaoImpl implements IBaseZsetRedisDao {
 	 */
 	public Set<String> findByScoreDesc(double min,double max,int ... ids){
 		String key = buildKey(ids);
-		return stringRedisTemplate.opsForZSet().reverseRangeByScore(key, min, max);
+		return stringRedisTemplate().opsForZSet().reverseRangeByScore(key, min, max);
 	}
 	
 	/**
@@ -80,7 +88,7 @@ public class BaseZsetRedisDaoImpl implements IBaseZsetRedisDao {
 	 */
 	public Set<String> findByScoreAsc(double min,double max, long offset, long count, int ... ids){
 		String key = buildKey(ids);
-		return stringRedisTemplate.opsForZSet().rangeByScore(key, min, max, offset, count);
+		return stringRedisTemplate().opsForZSet().rangeByScore(key, min, max, offset, count);
 	}
 	
 	/**
@@ -94,7 +102,7 @@ public class BaseZsetRedisDaoImpl implements IBaseZsetRedisDao {
 	 */
 	public Set<String> findByScoreDesc(double min,double max,  long offset, long count, int ... ids){
 		String key = buildKey(ids);
-		return stringRedisTemplate.opsForZSet().reverseRangeByScore(key, min, max, offset, count);
+		return stringRedisTemplate().opsForZSet().reverseRangeByScore(key, min, max, offset, count);
 	}
 	
 
@@ -108,7 +116,7 @@ public class BaseZsetRedisDaoImpl implements IBaseZsetRedisDao {
 	 */
 	public Set<String> findByIdAsc(long start,long end, int ... ids){
 		String key = buildKey(ids);
-		return stringRedisTemplate.opsForZSet().range(key, start, end);
+		return stringRedisTemplate().opsForZSet().range(key, start, end);
 	}
 	
 	/**
@@ -117,7 +125,7 @@ public class BaseZsetRedisDaoImpl implements IBaseZsetRedisDao {
 	 */
 	public Set<String> findByIdDesc(long start,long end, int ... ids){
 		String key = buildKey(ids);
-		return stringRedisTemplate.opsForZSet().reverseRange(key, start, end);
+		return stringRedisTemplate().opsForZSet().reverseRange(key, start, end);
 	}
 	
 	/**
@@ -126,7 +134,7 @@ public class BaseZsetRedisDaoImpl implements IBaseZsetRedisDao {
 	public List<ZsetResult> findByScoreWithScoresAsc(double min,double max, int ... ids){
 		List<ZsetResult> zsetResults = new ArrayList<ZsetResult>();
 		String key = buildKey(ids);
-		Set<TypedTuple<String>> results = stringRedisTemplate.opsForZSet().rangeByScoreWithScores(key, min, max);
+		Set<TypedTuple<String>> results = stringRedisTemplate().opsForZSet().rangeByScoreWithScores(key, min, max);
 		for(TypedTuple<String>  tt: results){
 			zsetResults.add(new ZsetResult(tt.getValue(), tt.getScore()));
 		}
@@ -140,7 +148,7 @@ public class BaseZsetRedisDaoImpl implements IBaseZsetRedisDao {
 	public List<ZsetResult> findByScoreWithScoresDesc(double min,double max, int ... ids){
 		List<ZsetResult> zsetResults = new ArrayList<ZsetResult>();
 		String key = buildKey(ids);
-		Set<TypedTuple<String>> results = stringRedisTemplate.opsForZSet().reverseRangeByScoreWithScores(key, min, max);
+		Set<TypedTuple<String>> results = stringRedisTemplate().opsForZSet().reverseRangeByScoreWithScores(key, min, max);
 		for(TypedTuple<String>  tt: results){
 			zsetResults.add(new ZsetResult(tt.getValue(), tt.getScore()));
 		}
@@ -156,7 +164,7 @@ public class BaseZsetRedisDaoImpl implements IBaseZsetRedisDao {
 	public List<ZsetResult> findByScoreWithScoresAsc(double min,double max, long offset, long count,int ... ids){
 		List<ZsetResult> zsetResults = new ArrayList<ZsetResult>();
 		String key = buildKey(ids);
-		Set<TypedTuple<String>> results = stringRedisTemplate.opsForZSet().rangeByScoreWithScores(key, min, max, offset, count);
+		Set<TypedTuple<String>> results = stringRedisTemplate().opsForZSet().rangeByScoreWithScores(key, min, max, offset, count);
 		for(TypedTuple<String>  tt: results){
 			zsetResults.add(new ZsetResult(tt.getValue(), tt.getScore()));
 		}
@@ -172,7 +180,7 @@ public class BaseZsetRedisDaoImpl implements IBaseZsetRedisDao {
 	public List<ZsetResult> findByScoreWithScoresDesc(double min,double max, long offset, long count,int ... ids){
 		List<ZsetResult> zsetResults = new ArrayList<ZsetResult>();
 		String key = buildKey(ids);
-		Set<TypedTuple<String>> results = stringRedisTemplate.opsForZSet().reverseRangeByScoreWithScores(key, min, max, offset, count);
+		Set<TypedTuple<String>> results = stringRedisTemplate().opsForZSet().reverseRangeByScoreWithScores(key, min, max, offset, count);
 		for(TypedTuple<String>  tt: results){
 			zsetResults.add(new ZsetResult(tt.getValue(), tt.getScore()));
 		}
@@ -188,7 +196,7 @@ public class BaseZsetRedisDaoImpl implements IBaseZsetRedisDao {
 	 */
 	public double getScore(String member,int ... ids){
 		String key = buildKey(ids);
-		Double score = stringRedisTemplate.opsForZSet().score(key, member);
+		Double score = stringRedisTemplate().opsForZSet().score(key, member);
 		if(score == null){
 			return 0.0;
 		}
@@ -215,7 +223,7 @@ public class BaseZsetRedisDaoImpl implements IBaseZsetRedisDao {
 	 */
 	public long size(int ... ids){
 		 String key = buildKey(ids);
-		 Long size = stringRedisTemplate.opsForZSet().size(key);
+		 Long size = stringRedisTemplate().opsForZSet().size(key);
 		 if(size == null){
 			 return 0;
 		 }
@@ -230,7 +238,7 @@ public class BaseZsetRedisDaoImpl implements IBaseZsetRedisDao {
 	 */
 	public long rangeSize(double min,double max,int ... ids){
 		String key = buildKey(ids);
-		Long size = stringRedisTemplate.opsForZSet().count(key, min, max);
+		Long size = stringRedisTemplate().opsForZSet().count(key, min, max);
 		if(size == null){
 			return 0;
 		}
@@ -244,7 +252,7 @@ public class BaseZsetRedisDaoImpl implements IBaseZsetRedisDao {
 	 */
 	public boolean remove(String member,int ... ids){
 		String key = buildKey(ids);
-		return stringRedisTemplate.opsForZSet().remove(key, member) > 0 ?  true : false;
+		return stringRedisTemplate().opsForZSet().remove(key, member) > 0 ?  true : false;
 	}
 	
 	/**
@@ -256,7 +264,7 @@ public class BaseZsetRedisDaoImpl implements IBaseZsetRedisDao {
 	 */
 	public boolean removeRange(long start, long end, int... ids){
 		String key = buildKey(ids);
-		return stringRedisTemplate.opsForZSet().removeRange(key, start, end) > 0 ? true : false;
+		return stringRedisTemplate().opsForZSet().removeRange(key, start, end) > 0 ? true : false;
 	}
 	
 	/**
@@ -268,7 +276,7 @@ public class BaseZsetRedisDaoImpl implements IBaseZsetRedisDao {
 	 */
 	public boolean removeRangeByScore(double min,double max,int... ids){
 		String key = buildKey(ids);
-		return stringRedisTemplate.opsForZSet().removeRangeByScore(key, min, max) > 0 ? true : false;
+		return stringRedisTemplate().opsForZSet().removeRangeByScore(key, min, max) > 0 ? true : false;
 	}
 	
 	private String buildKey(int ... ids){

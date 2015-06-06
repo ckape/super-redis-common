@@ -5,21 +5,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-
-import javax.annotation.Resource;
-
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.StringRedisConnection;
 import org.springframework.data.redis.core.RedisCallback;
-import org.springframework.data.redis.core.StringRedisTemplate;
-
 import cn.friday.base.service.global.redis.dao.IBaseHashRedisDao;
+import cn.friday.base.service.global.redis.dao.IRedisOpsTemplate;
 
-public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T> {
-	
-	@Resource
-	StringRedisTemplate stringRedisTemplate; 
+public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, IRedisOpsTemplate {
 	
 	private Class<T> entityClazz;
 	
@@ -33,7 +26,7 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T> {
 	@Override
 	public T findById(long id) {
 		String key = MessageFormat.format(baseKey, id + "");
-		Map<Object, Object> entityMap = stringRedisTemplate.opsForHash().entries(key);
+		Map<Object, Object> entityMap = stringRedisTemplate().opsForHash().entries(key);
 		entityMap.put("id", id);
 		return getBaseRedisMapper().fromObjectHash(entityMap);
 	}
@@ -46,10 +39,12 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T> {
 	 */
 	@Deprecated
 	public List<T> multiFindByIds(final List<Long> ids){
-		List<Object> results = stringRedisTemplate.executePipelined(new RedisCallback<List<T>>() {
+		List<Object> results = stringRedisTemplate().executePipelined(new RedisCallback<List<T>>() {
 			public List<T> doInRedis(RedisConnection connection) throws DataAccessException {
+				
 				List<T> list = new ArrayList<T>();
 				StringRedisConnection stringRedisConn = (StringRedisConnection) connection;
+				
 				for(long id:ids){
 					String key = MessageFormat.format(baseKey, id + "");
 					System.out.println(key);
@@ -58,6 +53,7 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T> {
 					map.put("id", id+"");
 					list.add(getBaseRedisMapper().fromHash(map));
 				}
+				
 				return list;
 			}
 		});
@@ -82,7 +78,7 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T> {
 		long id = makeId(keyName);
 		Map<String, String> map = getBaseRedisMapper().toHash(t);
 		String key = MessageFormat.format(baseKey, id + "");
-		stringRedisTemplate.opsForHash().putAll(key, map);
+		stringRedisTemplate().opsForHash().putAll(key, map);
 		return id;
 	}
 	/**
@@ -94,7 +90,7 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T> {
 	public long save(T t, int expireTime){
 		long id = save(t);
 		String key = MessageFormat.format(baseKey, id + "");
-		stringRedisTemplate.expire(key, expireTime, TimeUnit.SECONDS);
+		stringRedisTemplate().expire(key, expireTime, TimeUnit.SECONDS);
 		return id;
 	}
 	
@@ -108,7 +104,7 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T> {
 	public long save(T t, long id){
 		Map<String, String> map = getBaseRedisMapper().toHash(t);
 		String key = MessageFormat.format(baseKey, id + "");
-		stringRedisTemplate.opsForHash().putAll(key, map);
+		stringRedisTemplate().opsForHash().putAll(key, map);
 		return id;
 	}
 	
@@ -122,7 +118,7 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T> {
 	public long save(T t, long id,int expireTime){
 	      save(t, id);
 	      String key = MessageFormat.format(baseKey, id + "");  
-	      stringRedisTemplate.expire(key, expireTime, TimeUnit.SECONDS);
+	      stringRedisTemplate().expire(key, expireTime, TimeUnit.SECONDS);
 	      return id;
 	}
 	
@@ -133,7 +129,7 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T> {
 	 */
 	public boolean exists(long id){
 		String key = MessageFormat.format(baseKey, id + "");
-		return stringRedisTemplate.getConnectionFactory().getConnection().exists(key.getBytes());
+		return stringRedisTemplate().getConnectionFactory().getConnection().exists(key.getBytes());
 	}
 	
 	/**
@@ -143,7 +139,7 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T> {
 	 */
 	public long deleteById(long id) {
 		String key = MessageFormat.format(baseKey, id + "");
-		stringRedisTemplate.delete(key);
+		stringRedisTemplate().delete(key);
 		return id;
 	}
 	
@@ -156,7 +152,7 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T> {
 	 */
 	public  long updateByProperty(String propertyName, Object value, long id) {
 		String key = MessageFormat.format(baseKey, id + "");
-		stringRedisTemplate.opsForHash().put(key, propertyName, String.valueOf(value));
+		stringRedisTemplate().opsForHash().put(key, propertyName, String.valueOf(value));
 		return id;
 	}
 	
@@ -168,7 +164,7 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T> {
 	 */
 	public long updateByMap( Map<String, String> map, long id) {
 		String key = MessageFormat.format(baseKey, id + "");
-		stringRedisTemplate.opsForHash().putAll(key, map);
+		stringRedisTemplate().opsForHash().putAll(key, map);
 		return id;
 	} 
 	
@@ -181,7 +177,7 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T> {
 	 */
 	public boolean increment(String haskField,long delta, long id){
 		String key = MessageFormat.format(baseKey, id + "");
-		return stringRedisTemplate.opsForHash().increment(key, haskField, delta) > 0 ? true : false;
+		return stringRedisTemplate().opsForHash().increment(key, haskField, delta) > 0 ? true : false;
 	}
 	
 	private String createKeyName(){
@@ -191,10 +187,10 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T> {
 	}
 	
 	private long makeId(String key){
-		long id = stringRedisTemplate.getConnectionFactory().getConnection().incr(key.getBytes());
+		long id = stringRedisTemplate().getConnectionFactory().getConnection().incr(key.getBytes());
 		if( (id + 75807) >= Long.MAX_VALUE ){
 			// 避免溢出，重置，getSet命令之前允许incr插队，75807就是预留的插队空间
-			stringRedisTemplate.opsForValue().set(key, "0");
+			stringRedisTemplate().opsForValue().set(key, "0");
 		}
 		return id;
 	}

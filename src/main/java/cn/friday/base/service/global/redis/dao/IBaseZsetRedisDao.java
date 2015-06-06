@@ -3,6 +3,8 @@ package cn.friday.base.service.global.redis.dao;
 import java.util.List;
 import java.util.Set;
 
+import org.springframework.data.redis.core.ZSetOperations.TypedTuple;
+
 import cn.friday.base.service.global.redis.bo.ZsetResult;
 
 public interface IBaseZsetRedisDao {
@@ -16,6 +18,14 @@ public interface IBaseZsetRedisDao {
 	 * @return
 	 */
 	public boolean add( String member,  double score,int ... ids);
+	
+	/**
+	 * 增加多个成员
+	 * @param tuples
+	 * @param ids
+	 * @return
+	 */
+	public boolean add(Set<TypedTuple<String>> tuples, int ... ids);
 	
 	/**
 	 * 增加指定元素的分值

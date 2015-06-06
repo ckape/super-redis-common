@@ -1,9 +1,14 @@
 package cn.friday.base.service.global.redis.dao.zset;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.SpringApplicationConfiguration;
+import org.springframework.data.redis.core.DefaultTypedTuple;
+import org.springframework.data.redis.core.ZSetOperations.TypedTuple;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import cn.friday.base.service.global.Application;
@@ -63,6 +68,12 @@ public class BaseZsetSegmentRedisDaoTests {
 	@Test
 	public void testAddOneElement(){
 		segmentTimelineDao.add("91", 191, 1);
+	}
+	
+	public void testAddMoreElement(){
+		Set<TypedTuple<String>> tuples = new HashSet<TypedTuple<String>>();
+		tuples.add(new DefaultTypedTuple<String>("1", (double)System.currentTimeMillis()));
+		segmentTimelineDao.add(tuples, 1);
 	}
 	
 	

@@ -12,13 +12,11 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import com.google.common.base.Joiner;
 
 import cn.friday.base.service.global.redis.dao.IBaseListRedisDao;
+import cn.friday.base.service.global.redis.dao.IRedisOpsTemplate;
 
-public class BaseListRedisDaoImpl implements IBaseListRedisDao {
+public abstract class BaseListRedisDaoImpl implements IBaseListRedisDao,IRedisOpsTemplate {
 	
 	private String baseKey;
-	
-	@Resource
-	StringRedisTemplate stringRedisTemplate; 
 	
 	public BaseListRedisDaoImpl(String baseKey){
 		this.baseKey = baseKey+":{0}";
@@ -53,7 +51,7 @@ public class BaseListRedisDaoImpl implements IBaseListRedisDao {
 	
 	private BoundListOperations<String, String> boundListOps(int... ids){
 		String key = buildKey(ids);
-		return stringRedisTemplate.boundListOps(key);
+		return stringRedisTemplate().boundListOps(key);
 	}
 	
 	private String buildKey(int ... ids){
