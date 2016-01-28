@@ -19,6 +19,7 @@ import cn.friday.base.service.global.redis.bo.SimpleTypeTuple;
 import cn.friday.base.service.global.redis.bo.ZsetResult;
 import cn.friday.base.service.global.redis.dao.IBaseZsetRedisDao;
 import cn.friday.base.service.global.redis.dao.IRedisOpsTemplate;
+import cn.friday.base.service.global.redis.registry.RegistryService;
 import cn.friday.base.service.global.redis.util.MemberUtil;
 
 /**
@@ -32,6 +33,7 @@ public abstract class BaseZsetRedisDaoImpl<T> implements IBaseZsetRedisDao<T>,IR
 	
 	public BaseZsetRedisDaoImpl(String baseKey, Class <T> entityClass ){
 		this.baseKey = baseKey+":{0}";
+		RegistryService.registry(baseKey);
 		memberUtil = new MemberUtil<T>(entityClass);
 	}
 	
@@ -246,15 +248,34 @@ public abstract class BaseZsetRedisDaoImpl<T> implements IBaseZsetRedisDao<T>,IR
 	
 	/**
 	 * 查询成员对应的分值
+	 * 无法确实member是否存在，还是score为0
+	 * 推荐使用 score()
+	 * @see score 
 	 * @param member
 	 * @param ids
 	 * @return
 	 */
+	@Deprecated
 	public double getScore(T member,int ... ids){
 		String key = buildKey(ids);
 		Double score = stringRedisTemplate().opsForZSet().score(key, memberUtil.getMember(member));
 		if(score == null){
 			return 0.0;
+		}
+		return score;
+	}
+	
+	/**
+	 * 查询成员对应的分值
+	 * @param member
+	 * @param ids
+	 * @return -999999：表示元素在zset中不存在
+	 */
+	public double score(T member,int ... ids){
+		String key = buildKey(ids);
+		Double score = stringRedisTemplate().opsForZSet().score(key, memberUtil.getMember(member));
+		if(score == null){
+			return NO_MEMBER;
 		}
 		return score;
 	}
@@ -367,6 +388,74 @@ public abstract class BaseZsetRedisDaoImpl<T> implements IBaseZsetRedisDao<T>,IR
 				return flag;
 			}
 		});
+	}
+	
+	/**
+	 * 获取第一个元素
+	 * 按照从小到大
+	 * @param ids
+	 * @return
+	 *@author BravoZu
+	 */
+	public ZsetResult<T> getFirstWithScore(int... ids){
+		List<ZsetResult<T>> result = findByScoreWithScoresAsc(0, System.currentTimeMillis(), 0L, 1L, ids);
+		if( result != null && !result.isEmpty()){
+			return result.get(0);
+		}
+		return null;
+	}
+	
+	/**
+	 * 获取最后一个元素
+	 * 按照从小到大
+	 * @param ids
+	 * @return
+	 *@author BravoZu
+	 */
+	public ZsetResult<T> getLastWithScore(int... ids){
+		List<ZsetResult<T>> result =findByScoreWithScoresDesc(0, System.currentTimeMillis(), 0L, 1L, ids);
+		if( result != null && !result.isEmpty()){
+			return result.get(0);
+		}
+		return null;
+	}
+	
+	/**
+	 * 获取列表中第一个元素
+	 * 按照从小到大
+	 * @param ids
+	 * @return
+	 *@author BravoZu
+	 */
+	public T getFirst(int... ids){
+		Set<T> result = findByScoreAsc(0, System.currentTimeMillis(), 0L, 1L, ids);
+		T retVal = null;
+		if( result != null && !result.isEmpty()){
+			for(T t:result){
+				retVal = t;
+				break;
+			}
+		}
+		return retVal;
+	}
+	
+	/**
+	 * 获取列表中第一个元素
+	 * 按照从小到大
+	 * @param ids
+	 * @return
+	 *@author BravoZu
+	 */
+	public T getLast(int... ids){
+		Set<T> result = findByScoreDesc(0, System.currentTimeMillis(), 0L, 1L, ids);
+		T retVal = null;
+		if( result != null && !result.isEmpty()){
+			for(T t:result){
+				retVal = t;
+				break;
+			}
+		}
+		return retVal;
 	}
 	
 	private String buildKey(int ... ids){

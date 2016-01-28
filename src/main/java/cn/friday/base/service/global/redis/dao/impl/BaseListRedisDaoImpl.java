@@ -5,12 +5,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 
+
 import org.springframework.data.redis.core.BoundListOperations;
 
 import com.google.common.base.Joiner;
 
 import cn.friday.base.service.global.redis.dao.IBaseListRedisDao;
 import cn.friday.base.service.global.redis.dao.IRedisOpsTemplate;
+import cn.friday.base.service.global.redis.registry.RegistryService;
 
 public abstract class BaseListRedisDaoImpl implements IBaseListRedisDao,IRedisOpsTemplate {
 	
@@ -18,6 +20,7 @@ public abstract class BaseListRedisDaoImpl implements IBaseListRedisDao,IRedisOp
 	
 	public BaseListRedisDaoImpl(String baseKey){
 		this.baseKey = baseKey+":{0}";
+		RegistryService.registry(baseKey);
 	}
 	
 	/**

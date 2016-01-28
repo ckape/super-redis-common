@@ -19,6 +19,7 @@ import cn.friday.base.service.global.redis.bo.SimpleTypeTuple;
 import cn.friday.base.service.global.redis.bo.ZsetResult;
 import cn.friday.base.service.global.redis.dao.IBaseZsetRedisDao;
 import cn.friday.base.service.global.redis.dao.IRedisOpsTemplate;
+import cn.friday.base.service.global.redis.registry.RegistryService;
 import cn.friday.base.service.global.redis.util.MemberUtil;
 
 public abstract class BaseZsetSegmentRedisDaoImpl<T> implements IBaseZsetRedisDao<T>,IRedisOpsTemplate {
@@ -42,6 +43,7 @@ public abstract class BaseZsetSegmentRedisDaoImpl<T> implements IBaseZsetRedisDa
 	public BaseZsetSegmentRedisDaoImpl(String baseKey, int segmentSize, Class <T> entityClass){
 		this.SEGMENT_SIZE = segmentSize;
 		this.baseKey = baseKey;
+		
 		buildSegmentBaseKey();
 		memberUtil = new MemberUtil<T>(entityClass);
 	}
@@ -287,6 +289,15 @@ public abstract class BaseZsetSegmentRedisDaoImpl<T> implements IBaseZsetRedisDa
 		}
 		return score;
 	}
+	
+	/**
+	 * 方法未实现
+	 */
+	@Override
+	@Deprecated
+	public double score(T member, int... ids) {
+		return 0;
+	}
 
 	@Override
 	public boolean existMember(T member, int... ids) {
@@ -505,6 +516,26 @@ public abstract class BaseZsetSegmentRedisDaoImpl<T> implements IBaseZsetRedisDa
 		}
 	}
 	
+	@Override
+	public T getFirst(int... ids) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+	
+	@Override
+	public ZsetResult<T> getFirstWithScore(int... ids) {
+		return null;
+	}
+	
+	@Override
+	public T getLast(int... ids) {
+		return null;
+	}
+	
+	@Override
+	public ZsetResult<T> getLastWithScore(int... ids) {
+		return null;
+	}
 	
 	/**
 	 * 构建分片的basekey
@@ -515,6 +546,7 @@ public abstract class BaseZsetSegmentRedisDaoImpl<T> implements IBaseZsetRedisDa
 	    	 StringBuilder baseKeyBuilder = new StringBuilder(baseKey);
 	    	 baseKeyBuilder.append(":").append(i).append(":").append("{0}");
 	    	 key[i] = baseKeyBuilder.toString();
+	    	 RegistryService.registry(baseKeyBuilder.toString());
 	     }
 	}
 	

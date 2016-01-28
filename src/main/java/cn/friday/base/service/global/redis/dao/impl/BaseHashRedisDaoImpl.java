@@ -12,6 +12,7 @@ import org.springframework.data.redis.core.RedisCallback;
 
 import cn.friday.base.service.global.redis.dao.IBaseHashRedisDao;
 import cn.friday.base.service.global.redis.dao.IRedisOpsTemplate;
+import cn.friday.base.service.global.redis.registry.RegistryService;
 
 public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, IRedisOpsTemplate {
 	
@@ -260,6 +261,7 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 	private void buildKey() {
 		String keyName = createKeyName();
 		this.baseKey = new StringBuffer().append(keyName).append(":{0}").toString();
+		RegistryService.registry(baseKey);
 	}
 	
 	

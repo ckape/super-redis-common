@@ -11,6 +11,11 @@ import cn.friday.base.service.global.redis.bo.ZsetResult;
 
 public interface IBaseZsetRedisDao<T> {
 	
+	/**
+	 * 元素在列表中不存在
+	 */
+	public final static int NO_MEMBER = -999999;
+	
 	
 	/**
 	 * 增加
@@ -164,6 +169,14 @@ public interface IBaseZsetRedisDao<T> {
 	public double getScore(T member,int ... ids);
 	
 	/**
+	 * 查询成员对应的分值
+	 * @param member
+	 * @param ids
+	 * @return -999999：表示元素在zset中不存在
+	 */
+	public double score(T member,int ... ids);
+	
+	/**
 	 * 判断成员是否存在
 	 * @param member
 	 * @param ids
@@ -226,6 +239,42 @@ public interface IBaseZsetRedisDao<T> {
 	 * @param ids
 	 */
 	public void expire(final long seconds, int... ids);
+	
+	/**
+	 * 获取列表中第一个元素
+	 * 按照从小到大
+	 * @param ids
+	 * @return
+	 *@author BravoZu
+	 */
+	public T getLast(int... ids);
+	
+	/**
+	 * 获取列表中第一个元素
+	 * 按照从小到大
+	 * @param ids
+	 * @return
+	 *@author BravoZu
+	 */
+	public T getFirst(int... ids);
+	
+	/**
+	 * 获取最后一个元素
+	 * 按照从小到大
+	 * @param ids
+	 * @return
+	 *@author BravoZu
+	 */
+	public ZsetResult<T> getLastWithScore(int... ids);
+	
+	/**
+	 * 获取第一个元素
+	 * 按照从小到大
+	 * @param ids
+	 * @return
+	 *@author BravoZu
+	 */
+	public ZsetResult<T> getFirstWithScore(int... ids);
 	
 
 }

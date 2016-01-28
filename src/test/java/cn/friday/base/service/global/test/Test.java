@@ -7,24 +7,29 @@ import org.apache.commons.beanutils.BeanUtilsBean;
 import org.apache.commons.beanutils.MethodUtils;
 import org.springframework.data.redis.hash.BeanUtilsHashMapper;
 
+import com.alibaba.fastjson.JSON;
+
 import cn.friday.base.service.global.redis.mapper.BaseRedisMapper;
 import cn.friday.base.service.global.redis.util.MemberUtil;
 
 public class Test {
 	
 	public static void main(String[] args) {
-		BaseData baseData = new BaseData();
 		
-		baseData.setAge(1);
-		baseData.setAny(true);
-		baseData.setId(1);
-		baseData.setMember("ddddd");
-		baseData.setName("wwwww");
+		System.out.println( JSON.parseObject("HELLO", String.class) );
 		
-		BaseRedisMapper<BaseData> mapper = new BaseRedisMapper<BaseData>(BaseData.class);
-		Map<String,String>  map = mapper.toHash(baseData);
-		BaseData b = mapper.fromHash(map);
-		System.out.println(b.getAge());
+//		BaseData baseData = new BaseData();
+//		
+//		baseData.setAge(1);
+//		baseData.setAny(true);
+//		baseData.setId(1);
+//		baseData.setMember("ddddd");
+//		baseData.setName("wwwww");
+//		
+//		BaseRedisMapper<BaseData> mapper = new BaseRedisMapper<BaseData>(BaseData.class);
+//		Map<String,String>  map = mapper.toHash(baseData);
+//		BaseData b = mapper.fromHash(map);
+//		System.out.println(b.getAge());
 		
 //		
 //		BeanUtilsBean beanUtilsBean = BeanUtilsBean.getInstance();
