@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>cn.friday</groupId>
 	<artifactId>super-redis-common</artifactId>
-	<version>0.7.9.RELEASE</version>
+	<version>0.9.3.RELEASE</version>
 	<packaging>jar</packaging>
 
 	<properties>
@@ -29,6 +29,12 @@
 		  <artifactId>guava</artifactId>
 		  <version>19.0</version>
 		  <scope>provided</scope>
+		</dependency>
+		
+		<dependency>
+			<groupId>log4j</groupId>
+			<artifactId>log4j</artifactId>
+			<scope>provided</scope>
 		</dependency>
 		
 	  <!-- redis客户端 -->
