@@ -38,11 +38,14 @@ public abstract class AbstractQueueConsumer<T> extends BaseMessageQueue<T> {
 		public void run() {
 			int fiboN = 0;
 			while(true){
-				logger.info(" QueueConsumer executor...");
 				T t = pop();
 				if( t != null ){
 					fiboN = 0;
-					onMessage(t);
+					try {
+						onMessage(t);
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
 				}else{
 					try {
 						long sleepSecond = FibonacciUtil.fibonacciNormal(fiboN);
@@ -84,7 +87,7 @@ public abstract class AbstractQueueConsumer<T> extends BaseMessageQueue<T> {
 	 * @param t
 	 *@author BravoZu
 	 */
-	protected abstract void onMessage(T t);
+	protected abstract void onMessage(T t) throws Exception;
 	
 	
 	

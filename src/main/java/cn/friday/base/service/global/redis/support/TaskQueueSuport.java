@@ -30,11 +30,19 @@ public abstract class TaskQueueSuport<T> implements IRedisOpsTemplate{
 	
 	private String baseKey;
 	
+	//保存检查队列是否有重复消息的key
+	private String checkKey;
+	
 	
 	/**
 	 * 默认的队列后缀
 	 */
 	private final static String REDIS_QUEUE_SUFFIX =".Queue";
+	
+	/**
+	 * 校验队列的后缀
+	 */
+	private final static String REDIS_CHECK_QUEUE_SUFFIX =".Timeline.Queue";
 	
 	private  ExecutorService executorService = null;
 	
@@ -47,9 +55,9 @@ public abstract class TaskQueueSuport<T> implements IRedisOpsTemplate{
 		this.entityClazz = entityClazz;
 		createKey();
 		if(executorService == null){
-			executorService = Executors.newFixedThreadPool(4);
+			executorService = Executors.newFixedThreadPool(2);
 			executorService.execute(new TaskExecutor() );
-			System.out.println(" start executor...");
+			logger.info(" start executor... ");
 		}
 	}
 	
@@ -59,8 +67,31 @@ public abstract class TaskQueueSuport<T> implements IRedisOpsTemplate{
 	 *@author BravoZu
 	 */
 	public void push(T t){
+		String msg = objectToString(t);
+		push(msg);
+	}
+	
+	/**
+	 * 相同消息，同一时刻内只有一个
+	 * 当这条消息被消费了
+	 * 才会再次进入任务队列
+	 * @param t
+	 *@author BravoZu
+	 */
+	public void singlePush(T t){
+		
+		String msg = objectToString(t);
+		String checkKey = buildCheckKey();
+		Double score = stringRedisTemplate().boundZSetOps(checkKey).score(msg);
+		if( score == null){
+			//检查队列中是否存在该消息
+			push(msg);
+		}
+	}
+	
+	private void push(String msg){
 		String key = buildKey();
-		stringRedisTemplate().boundListOps(key).leftPush(objectToString(t));
+		stringRedisTemplate().boundListOps(key).leftPush(msg);
 	}
 	
 	private T pop(){
@@ -72,6 +103,9 @@ public abstract class TaskQueueSuport<T> implements IRedisOpsTemplate{
 		String key = buildKey();
 		String retVal = stringRedisTemplate().boundListOps(key).rightPop();
 		if( !Strings.isNullOrEmpty(retVal) ){
+			//从监控队列中去掉
+			String checkKey = buildCheckKey();
+			 stringRedisTemplate().boundZSetOps(checkKey).remove(retVal);
 			return stringToObject(retVal);
 		}
 		
@@ -81,7 +115,9 @@ public abstract class TaskQueueSuport<T> implements IRedisOpsTemplate{
 	private void createKey()  {
 		String keyName = createKeyName();
 		this.baseKey = new StringBuffer().append(baseKey).append(keyName).append(REDIS_QUEUE_SUFFIX).append(":{0}").toString();
-		 RegistryService.registry(baseKey);
+		this.checkKey = new StringBuffer().append(baseKey).append(keyName).append(REDIS_CHECK_QUEUE_SUFFIX).append(":{0}").toString();
+		RegistryService.registry(baseKey);
+		RegistryService.registry(checkKey);
 	}
 	
 	private String createKeyName(){
@@ -97,9 +133,23 @@ public abstract class TaskQueueSuport<T> implements IRedisOpsTemplate{
 	 *@author BravoZu
 	 */
 	private String buildKey(long... ids){
-		
+		return baseBuildKey(baseKey, ids);
+	}
+	
+	/**
+	 * 
+	 * @param ids
+	 * @return
+	 *@author BravoZu
+	 */
+	private String buildCheckKey(long... ids){
+		return baseBuildKey(checkKey, ids);
+	}
+	
+	
+	private String baseBuildKey(String bk, long... ids){
 		if(ids.length == 0){
-			return baseKey.replace(":{0}", "");
+			return bk.replace(":{0}", "");
 		}else{
 			StringBuilder builder = new StringBuilder();
 			List<Long> list = new ArrayList<Long>();
@@ -107,7 +157,7 @@ public abstract class TaskQueueSuport<T> implements IRedisOpsTemplate{
 				list.add(ids[i]);
 			}
 		     Joiner.on(":").appendTo(builder, list);
-		     return MessageFormat.format(baseKey, builder.toString());
+		     return MessageFormat.format(bk, builder.toString());
 		}
 	}
 	
@@ -120,11 +170,15 @@ public abstract class TaskQueueSuport<T> implements IRedisOpsTemplate{
 				T t = pop();
 				if( t != null ){
 					fiboN = 0;
-					onMessage(t);
+					try {
+						onMessage(t);
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
 				}else{
 					try {
 					    long sleepSecond = FibonacciUtil.fibonacciNormal(fiboN);
-						if( sleepSecond > 60){
+						if( sleepSecond > 10){
 							fiboN = 0;
 							sleepSecond = FibonacciUtil.fibonacciNormal(fiboN);
 						}else{
@@ -208,6 +262,6 @@ public abstract class TaskQueueSuport<T> implements IRedisOpsTemplate{
 	 * @param t
 	 *@author BravoZu
 	 */
-	protected abstract void onMessage(T t);
+	protected abstract void onMessage(T t) throws Exception;
 	
 }
