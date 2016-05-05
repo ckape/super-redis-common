@@ -52,15 +52,7 @@
 			<groupId>org.springframework.data</groupId>
 			<artifactId>spring-data-redis</artifactId>
 		</dependency>
-
-	    
-	    <!--  共用类 -->
-		<dependency>
-		  <groupId>cn.friday</groupId>
-		  <artifactId>super-constant-common</artifactId>
-		  <version>0.1.3.RELEASE</version>
-		  <scope>provided</scope>
-		</dependency>
+		
 	    <dependency>
 		  <groupId>com.alibaba</groupId>
 		  <artifactId>fastjson</artifactId>
