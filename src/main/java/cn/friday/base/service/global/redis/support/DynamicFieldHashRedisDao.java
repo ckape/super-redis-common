@@ -36,9 +36,14 @@ public abstract class DynamicFieldHashRedisDao implements IRedisOpsTemplate{
 		
 		 boolean hasExpire = false;
 		 BoundHashOperations<String, Object, Object> oper = stringRedisTemplate().boundHashOps(key);
-		 if( !stringRedisTemplate().hasKey(key)){
+		 if( !stringRedisTemplate().hasKey(key) ){
 			 hasExpire = true;
 		 }
+		 if( checkDelStatus(key)){
+			 hasExpire = true;
+			 stringRedisTemplate().delete(key);
+		 }
+		 
 		 oper.putAll(map);
 		 
 		 //设置过期时间
@@ -91,6 +96,10 @@ public abstract class DynamicFieldHashRedisDao implements IRedisOpsTemplate{
 		 checkNotNull(key, "key 不能为空");
 		 checkArgument( !(fields == null || fields.size() == 0) , "fields 不能为空");
 		 
+		 if( checkDelStatus(key)){
+			 stringRedisTemplate().delete(key);
+		 }
+		 
 		 BoundHashOperations<String, String, String> oper = stringRedisTemplate().boundHashOps(key);
 		 return oper.multiGet(fields);
 	}
@@ -121,6 +130,13 @@ public abstract class DynamicFieldHashRedisDao implements IRedisOpsTemplate{
 		checkNotNull(field, "field 不能为空");
 		BoundHashOperations<String, String, String> oper = stringRedisTemplate().boundHashOps(key);
 		oper.delete(field);
+	}
+	
+	private boolean checkDelStatus( String key){
+		 if(  stringRedisTemplate().getExpire(key) == -1  ||  stringRedisTemplate().getExpire(key) == 0){
+			 return true;
+		 }
+		 return false;
 	}
 
 }

@@ -86,6 +86,7 @@ public abstract class TaskQueueSuport<T> implements IRedisOpsTemplate{
 		if( score == null){
 			//检查队列中是否存在该消息
 			push(msg);
+			stringRedisTemplate().boundZSetOps(checkKey).add(msg, System.currentTimeMillis());
 		}
 	}
 	
@@ -105,7 +106,7 @@ public abstract class TaskQueueSuport<T> implements IRedisOpsTemplate{
 		if( !Strings.isNullOrEmpty(retVal) ){
 			//从监控队列中去掉
 			String checkKey = buildCheckKey();
-			 stringRedisTemplate().boundZSetOps(checkKey).remove(retVal);
+			stringRedisTemplate().boundZSetOps(checkKey).remove(retVal);
 			return stringToObject(retVal);
 		}
 		
