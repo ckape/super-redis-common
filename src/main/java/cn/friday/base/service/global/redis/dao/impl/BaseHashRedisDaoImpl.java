@@ -179,6 +179,8 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 
 	/**
 	 * 更新一个值
+	 * 如果key存在的话，则更新redis中对应的key
+	 * 不存在则忽略
 	 * @param propertyName
 	 * @param value
 	 * @param id
@@ -186,21 +188,28 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 	 */
 	@Override
 	public long updateByProperty(String propertyName, Object value, long id) {
-		String key = MessageFormat.format(baseKey, id + "");
-		stringRedisTemplate().opsForHash().put(key, propertyName, String.valueOf(value));
+		if (exists(id)) {
+			String key = MessageFormat.format(baseKey, id + "");
+			stringRedisTemplate().opsForHash().put(key, propertyName, String.valueOf(value));
+		}
 		return id;
 	}
 
 	/**
+	 * 
 	 * 更新多个属性
+	 * 但key在redis中存在时才更新对应的值，
+	 * 不存在则忽略
 	 * @param map
 	 * @param id
 	 * @return
 	 */
 	@Override
 	public long updateByMap(Map<String, String> map, long id) {
-		String key = MessageFormat.format(baseKey, id + "");
-		stringRedisTemplate().opsForHash().putAll(key, map);
+		if (exists(id)) {
+			String key = MessageFormat.format(baseKey, id + "");
+			stringRedisTemplate().opsForHash().putAll(key, map);
+		}
 		return id;
 	}
 
@@ -255,14 +264,17 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 
 	/**
 	 * 持久化key值
-	 * 如果有过期时间的话
-	 * 设置成永不过期
+	 * 检查对应的key是否存在，如果存在设置该key永不过期
 	 * @param key
 	 */
 	@Override
 	public boolean persistKey(int id) {
-		String key = MessageFormat.format(baseKey, id + "");
-		return stringRedisTemplate().persist(key);
+		boolean flag = false;
+		if (exists(id)) {
+			String key = MessageFormat.format(baseKey, id + "");
+			flag = stringRedisTemplate().persist(key);
+		}
+		return flag;
 	}
 
 	private void buildKey() {
