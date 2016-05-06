@@ -12,6 +12,7 @@ import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.StringRedisConnection;
 import org.springframework.data.redis.core.RedisCallback;
 
+import com.google.common.base.Splitter;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -361,7 +362,8 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 							.build(new CacheLoader<String, T>() {
 								@Override
 								public T load(String key) throws Exception {
-									Long id = Long.parseLong(key);
+									List<String> list = Splitter.on(":").omitEmptyStrings().splitToList(key);
+									Long id = Long.parseLong(list.get(list.size() - 1));
 									return reloadData(id);
 								}
 							});
