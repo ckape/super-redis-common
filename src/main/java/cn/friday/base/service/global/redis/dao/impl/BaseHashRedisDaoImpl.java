@@ -4,16 +4,26 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.StringRedisConnection;
 import org.springframework.data.redis.core.RedisCallback;
 
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+
 import cn.friday.base.service.global.redis.dao.IBaseHashRedisDao;
 import cn.friday.base.service.global.redis.dao.IRedisOpsTemplate;
+import cn.friday.base.service.global.redis.loader.LoaderResult;
+import cn.friday.base.service.global.redis.loader.RedisLoader;
 import cn.friday.base.service.global.redis.registry.RegistryService;
 import cn.friday.base.service.global.redis.util.Constant;
+import cn.friday.base.service.global.redis.util.MethodHelper;
+import cn.friday.base.service.global.redis.util.ReflectUtil;
 
 public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, IRedisOpsTemplate {
 
@@ -21,7 +31,26 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 
 	private String baseKey;
 
+	//是否本地缓存
+	private boolean isLocalCache;
+
+	/**
+	 * 默认缓存的时间
+	 */
+	private final static int DEFAULT_CAHCE_SECOND = 1;
+
+	//本地缓存时间
+	private int cacheTime;
+
+	private volatile LoadingCache<String, T> cache;
+
 	public BaseHashRedisDaoImpl(Class<T> entityClazz) {
+		this.entityClazz = entityClazz;
+		buildKey();
+	}
+
+	public BaseHashRedisDaoImpl(Class<T> entityClazz, boolean isLocalCache) {
+		this.isLocalCache = isLocalCache;
 		this.entityClazz = entityClazz;
 		buildKey();
 	}
@@ -32,6 +61,52 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 		Map<Object, Object> entityMap = stringRedisTemplate().opsForHash().entries(key);
 		entityMap.put("id", id);
 		return getBaseRedisMapper().fromObjectHash(entityMap);
+	}
+
+	/**
+	 * 
+	 * @param id
+	 * @param loader (当redis中不存在时，如何恢复，继承这个抽象类)
+	 * @return 下午7:46:13
+	 * 2016年5月6日
+	 */
+	@Override
+	public T findById(long id, RedisLoader<T> loader) {
+		T t = null;
+		if (isLocalCache) {
+			//需要本地缓存
+			String key = MessageFormat.format(baseKey, id + "");
+			try {
+				t = initLocalCache().get(key);
+			} catch (ExecutionException e) {
+				e.printStackTrace();
+			}
+		}
+
+		if (t == null) {
+			t = findByIdToRedis(id, loader);
+		}
+		return t;
+	}
+
+	private T findByIdToRedis(long id, RedisLoader<T> loader) {
+		T t = findById(id);
+		if (t == null) {
+			synchronized (BaseHashRedisDaoImpl.class) {
+				//双重检查锁
+				t = findById(id);
+				if (t == null) {
+					LoaderResult<T> loaderResult = loader.call();
+					if (loaderResult.getV() != null && loaderResult.isCache()) {
+						//缓存对应数据
+						save(t, id, loaderResult.getExpireTime());
+						t = loaderResult.getV();
+					}
+				}
+			}
+
+		}
+		return t;
 	}
 
 	/**
@@ -96,20 +171,8 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 	@Override
 	public long save(T t, final int expireTime) {
 		long id = save(t);
-
 		final String key = MessageFormat.format(baseKey, id + "");
-		stringRedisTemplate().execute(new RedisCallback<Boolean>() {
-			@Override
-			public Boolean doInRedis(RedisConnection connection) throws DataAccessException {
-				Boolean flag = false;
-				try {
-					flag = connection.expire(key.getBytes(), expireTime);
-				} finally {
-					connection.close();
-				}
-				return flag;
-			}
-		});
+		MethodHelper.expire(stringRedisTemplate(), key, expireTime);
 		return id;
 	}
 
@@ -139,18 +202,7 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 	public long save(T t, long id, final int expireTime) {
 		save(t, id);
 		final String key = MessageFormat.format(baseKey, id + "");
-		stringRedisTemplate().execute(new RedisCallback<Boolean>() {
-			@Override
-			public Boolean doInRedis(RedisConnection connection) throws DataAccessException {
-				Boolean flag = false;
-				try {
-					flag = connection.expire(key.getBytes(), expireTime);
-				} finally {
-					connection.close();
-				}
-				return flag;
-			}
-		});
+		MethodHelper.expire(stringRedisTemplate(), key, expireTime);
 		return id;
 	}
 
@@ -238,10 +290,89 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 		return stringRedisTemplate().opsForHash().get(key, propertyName);
 	}
 
+	public Object findByProperty(String propertyName, long id, RedisLoader<T> loader) {
+		Object o = null;
+		if (isLocalCache) {
+			//本地取数据
+			String key = MessageFormat.format(baseKey, id + "");
+			T t = null;
+			try {
+				t = initLocalCache().get(key);
+			} catch (ExecutionException e) {
+				e.printStackTrace();
+			}
+			if (t != null) {
+				o = obtainValueByObjectProperty(t, propertyName);
+			}
+		}
+
+		if (o == null) {
+			if (!exists(id)) {
+				T t = findByIdToRedis(id, loader);
+				//反射拿到对应数据
+				if (t != null) {
+					o = obtainValueByObjectProperty(t, propertyName);
+				}
+			} else {
+				String key = MessageFormat.format(baseKey, id + "");
+				o = stringRedisTemplate().opsForHash().get(key, propertyName);
+			}
+		}
+		return o;
+	}
+
+	/**
+	 * 
+	 * 
+	 * @param t
+	 * @param propertyName
+	 * @return 下午8:02:39
+	 * 2016年5月6日
+	 * @author jiangnan.zjn@alibaba-inc.com
+	 */
+	private Object obtainValueByObjectProperty(T t, String propertyName) {
+		Object o = null;
+		try {
+			o = ReflectUtil.invokeGetterMethod(t, propertyName,
+					ReflectUtil.getOrderedFieldAndType(t).get(propertyName));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return o;
+	}
+
 	private String createKeyName() {
 		String entityClazzName = entityClazz.getSimpleName();
 		String keyName = entityClazzName.substring(0, entityClazzName.lastIndexOf(Constant.Redis.ENTITY_SUFFIX));
 		return keyName;
+	}
+
+	/**
+	 * 初始化本地缓存
+	 * 
+	 * @return 下午6:43:22
+	 * 2016年5月6日
+	 */
+	private LoadingCache<String, T> initLocalCache() {
+		if (cache == null) {
+			synchronized (BaseHashRedisDaoImpl.class) {
+				if (cache == null) {
+					cache = CacheBuilder.newBuilder().expireAfterWrite(getCacheTime(), TimeUnit.SECONDS)
+							.build(new CacheLoader<String, T>() {
+								@Override
+								public T load(String key) throws Exception {
+									Long id = Long.parseLong(key);
+									return reloadData(id);
+								}
+							});
+				}
+			}
+		}
+		return cache;
+	}
+
+	private T reloadData(long id) {
+		return findById(id);
 	}
 
 	private long makeId(final String key) {
@@ -275,6 +406,22 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 			flag = stringRedisTemplate().persist(key);
 		}
 		return flag;
+	}
+
+	public boolean isLocalCache() {
+		return isLocalCache;
+	}
+
+	public void setLocalCache(boolean isLocalCache) {
+		this.isLocalCache = isLocalCache;
+	}
+
+	public int getCacheTime() {
+		return cacheTime == 0 ? DEFAULT_CAHCE_SECOND : cacheTime;
+	}
+
+	public void setCacheTime(int cacheTime) {
+		this.cacheTime = cacheTime;
 	}
 
 	private void buildKey() {
