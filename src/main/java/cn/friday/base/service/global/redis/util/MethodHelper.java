@@ -5,9 +5,8 @@ import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
-
 public class MethodHelper {
-	
+
 	/**
 	 * 设置过期时间
 	 * @param stringRedisTemplate
@@ -16,15 +15,14 @@ public class MethodHelper {
 	 * @return
 	 *@author BravoZu
 	 */
-	public static boolean expire(StringRedisTemplate stringRedisTemplate, final String key, final long seconds){
+	public static boolean expire(StringRedisTemplate stringRedisTemplate, final String key, final long seconds) {
 		stringRedisTemplate.execute(new RedisCallback<Boolean>() {
 			@Override
-			public Boolean doInRedis(RedisConnection connection)
-					throws DataAccessException {
-				Boolean flag =false;
-				try{
-					flag =  connection.expire(key.getBytes(), seconds);
-				}finally{
+			public Boolean doInRedis(RedisConnection connection) throws DataAccessException {
+				Boolean flag = false;
+				try {
+					flag = connection.expire(key.getBytes(), seconds);
+				} finally {
 					connection.close();
 				}
 				return flag;
@@ -32,5 +30,9 @@ public class MethodHelper {
 		});
 		return true;
 	}
-	
+
+	public static int defaultMaxThreads() {
+		return (Runtime.getRuntime().availableProcessors() + 1) * 2;
+	}
+
 }

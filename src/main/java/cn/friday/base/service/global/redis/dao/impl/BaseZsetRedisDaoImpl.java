@@ -33,6 +33,9 @@ public abstract class BaseZsetRedisDaoImpl<T> implements IBaseZsetRedisDao<T>, I
 
 	private MemberUtil<T> memberUtil;
 
+	//对象锁
+	private Object lock = new Object();
+
 	public BaseZsetRedisDaoImpl(String baseKey, Class<T> entityClass) {
 		this.baseKey = baseKey + ":{0}";
 		RegistryService.registry(baseKey);
@@ -121,7 +124,7 @@ public abstract class BaseZsetRedisDaoImpl<T> implements IBaseZsetRedisDao<T>, I
 	public Set<T> findByScoreAsc(double min, double max, RedisLoader<List<ZsetResult<T>>> loader, int... ids) {
 		Set<T> result = findByScoreAsc(min, max, ids);
 		if (result == null) {
-			synchronized (BaseZsetRedisDaoImpl.class) {
+			synchronized (lock) {
 				result = findByScoreAsc(min, max, ids);
 				if (result == null) {
 					result = reloadWithOutScore(loader, ids);
@@ -158,7 +161,7 @@ public abstract class BaseZsetRedisDaoImpl<T> implements IBaseZsetRedisDao<T>, I
 	public Set<T> findByScoreDesc(double min, double max, RedisLoader<List<ZsetResult<T>>> loader, int... ids) {
 		Set<T> result = findByScoreDesc(min, max, ids);
 		if (result == null) {
-			synchronized (BaseZsetRedisDaoImpl.class) {
+			synchronized (lock) {
 				result = findByScoreDesc(min, max, ids);
 				if (result == null) {
 					result = reloadWithOutScore(loader, ids);
@@ -190,7 +193,7 @@ public abstract class BaseZsetRedisDaoImpl<T> implements IBaseZsetRedisDao<T>, I
 			RedisLoader<List<ZsetResult<T>>> loader, int... ids) {
 		Set<T> result = findByScoreAsc(min, max, offset, count, ids);
 		if (result == null || result.size() < count) {
-			synchronized (BaseZsetRedisDaoImpl.class) {
+			synchronized (lock) {
 				result = findByScoreAsc(min, max, offset, count, ids);
 				if (result == null || result.size() < count) {
 					result = reloadWithOutScore(loader, ids);
@@ -232,7 +235,7 @@ public abstract class BaseZsetRedisDaoImpl<T> implements IBaseZsetRedisDao<T>, I
 			RedisLoader<List<ZsetResult<T>>> loader, int... ids) {
 		Set<T> result = findByScoreDesc(min, max, offset, count, ids);
 		if (result == null || result.size() < count) {
-			synchronized (BaseZsetRedisDaoImpl.class) {
+			synchronized (lock) {
 				result = findByScoreDesc(min, max, offset, count, ids);
 				if (result == null || result.size() < count) {
 					result = reloadWithOutScore(loader, ids);
@@ -270,7 +273,7 @@ public abstract class BaseZsetRedisDaoImpl<T> implements IBaseZsetRedisDao<T>, I
 	public Set<T> findByIdAsc(long start, long end, RedisLoader<List<ZsetResult<T>>> loader, int... ids) {
 		Set<T> result = findByIdAsc(start, end, ids);
 		if (result == null) {
-			synchronized (BaseZsetRedisDaoImpl.class) {
+			synchronized (lock) {
 				result = findByIdAsc(start, end, ids);
 				if (result == null) {
 					result = reloadWithOutScore(loader, ids);
@@ -303,7 +306,7 @@ public abstract class BaseZsetRedisDaoImpl<T> implements IBaseZsetRedisDao<T>, I
 	public Set<T> findByIdDesc(long start, long end, RedisLoader<List<ZsetResult<T>>> loader, int... ids) {
 		Set<T> result = findByIdDesc(start, end, ids);
 		if (result == null) {
-			synchronized (BaseZsetRedisDaoImpl.class) {
+			synchronized (lock) {
 				result = findByIdDesc(start, end, ids);
 				if (result == null) {
 					result = reloadWithOutScore(loader, ids);
@@ -341,7 +344,7 @@ public abstract class BaseZsetRedisDaoImpl<T> implements IBaseZsetRedisDao<T>, I
 			int... ids) {
 		List<ZsetResult<T>> result = findByIdWithScoresAsc(start, end, ids);
 		if (result == null) {
-			synchronized (BaseZsetRedisDaoImpl.class) {
+			synchronized (lock) {
 				result = findByIdWithScoresAsc(start, end, ids);
 				if (result != null) {
 					result = reloadWithScore(loader, ids);
@@ -369,7 +372,7 @@ public abstract class BaseZsetRedisDaoImpl<T> implements IBaseZsetRedisDao<T>, I
 			int... ids) {
 		List<ZsetResult<T>> result = findByScoreWithScoresAsc(min, max, ids);
 		if (result == null) {
-			synchronized (BaseZsetRedisDaoImpl.class) {
+			synchronized (lock) {
 				result = findByScoreWithScoresAsc(min, max, ids);
 				if (result == null) {
 					result = reloadWithScore(loader, ids);
@@ -403,7 +406,7 @@ public abstract class BaseZsetRedisDaoImpl<T> implements IBaseZsetRedisDao<T>, I
 			RedisLoader<List<ZsetResult<T>>> loader, int... ids) {
 		List<ZsetResult<T>> result = findByScoreWithScoresDesc(min, max, ids);
 		if (result == null) {
-			synchronized (BaseZsetRedisDaoImpl.class) {
+			synchronized (lock) {
 				result = findByScoreWithScoresDesc(min, max, ids);
 				if (result == null) {
 					result = reloadWithScore(loader, ids);
@@ -441,7 +444,7 @@ public abstract class BaseZsetRedisDaoImpl<T> implements IBaseZsetRedisDao<T>, I
 			RedisLoader<List<ZsetResult<T>>> loader, int... ids) {
 		List<ZsetResult<T>> result = findByScoreWithScoresAsc(min, max, offset, count, ids);
 		if (result == null) {
-			synchronized (BaseZsetRedisDaoImpl.class) {
+			synchronized (lock) {
 				result = findByScoreWithScoresAsc(min, max, offset, count, ids);
 				if (result == null) {
 					result = reloadWithScore(loader, ids);
@@ -479,7 +482,7 @@ public abstract class BaseZsetRedisDaoImpl<T> implements IBaseZsetRedisDao<T>, I
 			RedisLoader<List<ZsetResult<T>>> loader, int... ids) {
 		List<ZsetResult<T>> result = findByScoreWithScoresDesc(min, max, offset, count, ids);
 		if (result == null) {
-			synchronized (BaseZsetRedisDaoImpl.class) {
+			synchronized (lock) {
 				result = findByScoreWithScoresDesc(min, max, offset, count, ids);
 				if (result == null) {
 					result = reloadWithScore(loader, ids);

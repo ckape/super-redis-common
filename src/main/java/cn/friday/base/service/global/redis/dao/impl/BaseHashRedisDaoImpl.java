@@ -5,6 +5,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.springframework.dao.DataAccessException;
@@ -16,12 +18,15 @@ import com.google.common.base.Splitter;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 
 import cn.friday.base.service.global.redis.dao.IBaseHashRedisDao;
 import cn.friday.base.service.global.redis.dao.IRedisOpsTemplate;
 import cn.friday.base.service.global.redis.loader.LoaderResult;
 import cn.friday.base.service.global.redis.loader.RedisLoader;
 import cn.friday.base.service.global.redis.registry.RegistryService;
+import cn.friday.base.service.global.redis.syncer.Syncer;
 import cn.friday.base.service.global.redis.util.Constant;
 import cn.friday.base.service.global.redis.util.MethodHelper;
 import cn.friday.base.service.global.redis.util.ReflectUtil;
@@ -45,19 +50,41 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 
 	private volatile LoadingCache<String, T> cache;
 
+	//对象锁
+	private Object lock = new Object();
+
+	private final ListeningExecutorService executorService;
+
 	public BaseHashRedisDaoImpl(Class<T> entityClazz) {
-		this.entityClazz = entityClazz;
-		buildKey();
+		this(entityClazz, false);
 	}
 
 	public BaseHashRedisDaoImpl(Class<T> entityClazz, boolean isLocalCache) {
 		this.isLocalCache = isLocalCache;
 		this.entityClazz = entityClazz;
 		buildKey();
+		executorService = MoreExecutors
+				.listeningDecorator(MoreExecutors.getExitingExecutorService(new ThreadPoolExecutor(1,
+						MethodHelper.defaultMaxThreads(), 60, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>())));
 	}
 
 	@Override
 	public T findById(long id) {
+		if (isLocalCache) {
+			return obtainByCache(id);
+		} else {
+			return doGetById(id);
+		}
+	}
+
+	/**
+	 * 直接从redis获取
+	 * @param id
+	 * @return 
+	 * 2016年5月7日 上午11:52:59
+	 * @author jiangnan.zjn@alibaba-inc.com
+	 */
+	private T doGetById(long id) {
 		String key = MessageFormat.format(baseKey, id + "");
 		Map<Object, Object> entityMap = stringRedisTemplate().opsForHash().entries(key);
 		entityMap.put("id", id);
@@ -75,13 +102,7 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 	public T findById(long id, RedisLoader<T> loader) {
 		T t = null;
 		if (isLocalCache) {
-			//需要本地缓存
-			String key = MessageFormat.format(baseKey, id + "");
-			try {
-				t = initLocalCache().get(key);
-			} catch (ExecutionException e) {
-				e.printStackTrace();
-			}
+			t = obtainByCache(id);
 		}
 
 		if (t == null) {
@@ -91,18 +112,18 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 	}
 
 	private T findByIdToRedis(long id, RedisLoader<T> loader) {
-		T t = findById(id);
+		T t = doGetById(id);
 		if (t == null) {
-			synchronized (BaseHashRedisDaoImpl.class) {
+			synchronized (lock) {
 				//双重检查锁
-				t = findById(id);
+				t = doGetById(id);
 				if (t == null) {
 					LoaderResult<T> loaderResult = loader.call();
 					if (loaderResult.getV() != null && loaderResult.isCache()) {
 						//缓存对应数据
 						save(t, id, loaderResult.getExpireTime());
-						t = loaderResult.getV();
 					}
+					t = loaderResult.getV();
 				}
 			}
 
@@ -164,6 +185,20 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 	}
 
 	/**
+	 * 
+	 * @param t
+	 * @param syncer
+	 * @return 
+	 */
+	@Override
+	public long save(T t, Syncer<T> syncer) {
+		long id = save(t);
+		//异步同步数据
+		asyncData(id, syncer);
+		return id;
+	}
+
+	/**
 	 * 保存实体，
 	 * @param t
 	 * @param expireTime 过期时间
@@ -172,6 +207,21 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 	@Override
 	public long save(T t, final int expireTime) {
 		long id = save(t);
+		final String key = MessageFormat.format(baseKey, id + "");
+		MethodHelper.expire(stringRedisTemplate(), key, expireTime);
+		return id;
+	}
+
+	/**
+	 * 
+	 * @param t
+	 * @param expireTime
+	 * @param syncer
+	 * @return 
+	 */
+	@Override
+	public long save(T t, final int expireTime, Syncer<T> syncer) {
+		long id = save(t, syncer);
 		final String key = MessageFormat.format(baseKey, id + "");
 		MethodHelper.expire(stringRedisTemplate(), key, expireTime);
 		return id;
@@ -193,6 +243,20 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 	}
 
 	/**
+	 * 保存数据，id已存在
+	 * @param t
+	 * @param id
+	 * @param syncer
+	 * @return 
+	 */
+	@Override
+	public long save(T t, long id, Syncer<T> syncer) {
+		save(t, id);
+		asyncData(id, syncer);
+		return id;
+	}
+
+	/**
 	 * 保存实体
 	 * @param t
 	 * @param id
@@ -202,6 +266,22 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 	@Override
 	public long save(T t, long id, final int expireTime) {
 		save(t, id);
+		final String key = MessageFormat.format(baseKey, id + "");
+		MethodHelper.expire(stringRedisTemplate(), key, expireTime);
+		return id;
+	}
+
+	/**
+	 * 保存有过期时间的数据
+	 * @param t
+	 * @param id
+	 * @param expireTime 秒
+	 * @param syncer
+	 * @return 
+	 */
+	@Override
+	public long save(T t, long id, final int expireTime, Syncer<T> syncer) {
+		save(t, id, syncer);
 		final String key = MessageFormat.format(baseKey, id + "");
 		MethodHelper.expire(stringRedisTemplate(), key, expireTime);
 		return id;
@@ -295,13 +375,7 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 		Object o = null;
 		if (isLocalCache) {
 			//本地取数据
-			String key = MessageFormat.format(baseKey, id + "");
-			T t = null;
-			try {
-				t = initLocalCache().get(key);
-			} catch (ExecutionException e) {
-				e.printStackTrace();
-			}
+			T t = obtainByCache(id);
 			if (t != null) {
 				o = obtainValueByObjectProperty(t, propertyName);
 			}
@@ -327,9 +401,7 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 	 * 
 	 * @param t
 	 * @param propertyName
-	 * @return 下午8:02:39
-	 * 2016年5月6日
-	 * @author jiangnan.zjn@alibaba-inc.com
+	 * @return 
 	 */
 	private Object obtainValueByObjectProperty(T t, String propertyName) {
 		Object o = null;
@@ -342,6 +414,24 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 		return o;
 	}
 
+	/**
+	 * 从缓存中获取数据
+	 * 
+	 * @param id
+	 * @return 
+	 */
+	private T obtainByCache(long id) {
+		T t = null;
+		//需要本地缓存
+		String key = MessageFormat.format(baseKey, id + "");
+		try {
+			t = initLocalCache().get(key);
+		} catch (ExecutionException e) {
+			e.printStackTrace();
+		}
+		return t;
+	}
+
 	private String createKeyName() {
 		String entityClazzName = entityClazz.getSimpleName();
 		String keyName = entityClazzName.substring(0, entityClazzName.lastIndexOf(Constant.Redis.ENTITY_SUFFIX));
@@ -350,13 +440,10 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 
 	/**
 	 * 初始化本地缓存
-	 * 
-	 * @return 下午6:43:22
-	 * 2016年5月6日
 	 */
 	private LoadingCache<String, T> initLocalCache() {
 		if (cache == null) {
-			synchronized (BaseHashRedisDaoImpl.class) {
+			synchronized (lock) {
 				if (cache == null) {
 					cache = CacheBuilder.newBuilder().expireAfterWrite(getCacheTime(), TimeUnit.SECONDS)
 							.build(new CacheLoader<String, T>() {
@@ -373,8 +460,21 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 		return cache;
 	}
 
+	/**
+	 * 异步同步数据
+	 * @param id
+	 * @param syncer 
+	 */
+	private void asyncData(long id, Syncer<T> syncer) {
+		T t = doGetById(id);
+		if (t != null) {
+			//异步同步数据
+			executorService.execute(new SyncExecutor<T>(syncer, t));
+		}
+	}
+
 	private T reloadData(long id) {
-		return findById(id);
+		return doGetById(id);
 	}
 
 	private long makeId(final String key) {
@@ -430,6 +530,23 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 		String keyName = createKeyName();
 		this.baseKey = new StringBuffer().append(keyName).append(":{0}").toString();
 		RegistryService.registry(baseKey);
+	}
+
+}
+
+class SyncExecutor<T> implements Runnable {
+
+	private Syncer<T> syncer;
+	private T t;
+
+	public SyncExecutor(Syncer<T> syncer, T t) {
+		this.syncer = syncer;
+		this.t = t;
+	}
+
+	@Override
+	public void run() {
+		syncer.excute(t);
 	}
 
 }

@@ -5,6 +5,7 @@ import java.util.Map;
 
 import cn.friday.base.service.global.redis.loader.RedisLoader;
 import cn.friday.base.service.global.redis.mapper.IBaseRedisMapper;
+import cn.friday.base.service.global.redis.syncer.Syncer;
 
 public interface IBaseHashRedisDao<T> {
 
@@ -29,6 +30,14 @@ public interface IBaseHashRedisDao<T> {
 	public long save(T t);
 
 	/**
+	 * 
+	 * @param t
+	 * @param syncer
+	 * @return 
+	 */
+	public long save(T t, Syncer<T> syncer);
+
+	/**
 	 * 保存实体，
 	 * @param t
 	 * @param expireTime 过期时间
@@ -36,7 +45,25 @@ public interface IBaseHashRedisDao<T> {
 	 */
 	public long save(T t, int expireTime);
 
+	/**
+	 * 
+	 * @param t
+	 * @param expireTime
+	 * @param syncer
+	 * @return 
+	 */
+	public long save(T t, final int expireTime, Syncer<T> syncer);
+
 	public long save(T t, long id);
+
+	/**
+	 * 保存数据，id已存在
+	 * @param t
+	 * @param id
+	 * @param syncer
+	 * @return 
+	 */
+	public long save(T t, long id, Syncer<T> syncer);
 
 	/**
 	 * 保存实体
@@ -46,6 +73,16 @@ public interface IBaseHashRedisDao<T> {
 	 * @return
 	 */
 	public long save(T t, long id, int expireTime);
+
+	/**
+	 * 保存有过期时间的数据
+	 * @param t
+	 * @param id
+	 * @param expireTime 秒
+	 * @param syncer
+	 * @return 
+	 */
+	public long save(T t, long id, final int expireTime, Syncer<T> syncer);
 
 	public boolean exists(long id);
 
