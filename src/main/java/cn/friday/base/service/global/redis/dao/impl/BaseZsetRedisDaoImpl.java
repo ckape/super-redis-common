@@ -7,20 +7,22 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.springframework.dao.DataAccessException;
-import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.core.DefaultTypedTuple;
-import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.ZSetOperations.TypedTuple;
 
 import com.google.common.base.Joiner;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 import cn.friday.base.service.global.redis.bo.SimpleTypeTuple;
 import cn.friday.base.service.global.redis.bo.ZsetResult;
 import cn.friday.base.service.global.redis.dao.IBaseZsetRedisDao;
 import cn.friday.base.service.global.redis.dao.IRedisOpsTemplate;
+import cn.friday.base.service.global.redis.loader.LoaderResult;
+import cn.friday.base.service.global.redis.loader.RedisLoader;
 import cn.friday.base.service.global.redis.registry.RegistryService;
 import cn.friday.base.service.global.redis.util.MemberUtil;
+import cn.friday.base.service.global.redis.util.MethodHelper;
 
 /**
  * @author Zz
@@ -107,6 +109,29 @@ public abstract class BaseZsetRedisDaoImpl<T> implements IBaseZsetRedisDao<T>, I
 	}
 
 	/**
+	 * 
+	 * 按照分值的升序排序
+	 * @param min
+	 * @param max
+	 * @param loader(回调类，在redis时查询不存在时调用)
+	 * @param ids
+	 * @return
+	 */
+	@Override
+	public Set<T> findByScoreAsc(double min, double max, RedisLoader<List<ZsetResult<T>>> loader, int... ids) {
+		Set<T> result = findByScoreAsc(min, max, ids);
+		if (result == null) {
+			synchronized (BaseZsetRedisDaoImpl.class) {
+				result = findByScoreAsc(min, max, ids);
+				if (result == null) {
+					result = reloadWithOutScore(loader, ids);
+				}
+			}
+		}
+		return result;
+	}
+
+	/**
 	 * 按照分值的降序排序
 	 * @param min
 	 * @param max
@@ -118,6 +143,29 @@ public abstract class BaseZsetRedisDaoImpl<T> implements IBaseZsetRedisDao<T>, I
 		String key = buildKey(ids);
 		Set<String> members = stringRedisTemplate().opsForZSet().reverseRangeByScore(key, min, max);
 		return memberUtil.getSet(members);
+	}
+
+	/**
+	 * 
+	 * 按照分值的降序排序
+	 * @param min
+	 * @param max
+	 * @param loader
+	 * @param ids
+	 * @return 
+	 */
+	@Override
+	public Set<T> findByScoreDesc(double min, double max, RedisLoader<List<ZsetResult<T>>> loader, int... ids) {
+		Set<T> result = findByScoreDesc(min, max, ids);
+		if (result == null) {
+			synchronized (BaseZsetRedisDaoImpl.class) {
+				result = findByScoreDesc(min, max, ids);
+				if (result == null) {
+					result = reloadWithOutScore(loader, ids);
+				}
+			}
+		}
+		return result;
 	}
 
 	/**
@@ -133,6 +181,26 @@ public abstract class BaseZsetRedisDaoImpl<T> implements IBaseZsetRedisDao<T>, I
 	}
 
 	/**
+	 * 按照分值的升序排序
+	 * offset 从第几个开始
+	 * count 总共多少条
+	 */
+	@Override
+	public Set<T> findByScoreAsc(double min, double max, long offset, long count,
+			RedisLoader<List<ZsetResult<T>>> loader, int... ids) {
+		Set<T> result = findByScoreAsc(min, max, offset, count, ids);
+		if (result == null || result.size() < count) {
+			synchronized (BaseZsetRedisDaoImpl.class) {
+				result = findByScoreAsc(min, max, offset, count, ids);
+				if (result == null || result.size() < count) {
+					result = reloadWithOutScore(loader, ids);
+				}
+			}
+		}
+		return result;
+	}
+
+	/**
 	 * 按照分值的排序（降序）
 	 * @param min
 	 * @param max
@@ -145,8 +213,33 @@ public abstract class BaseZsetRedisDaoImpl<T> implements IBaseZsetRedisDao<T>, I
 	public Set<T> findByScoreDesc(double min, double max, long offset, long count, int... ids) {
 		String key = buildKey(ids);
 		Set<String> members = stringRedisTemplate().opsForZSet().reverseRangeByScore(key, min, max, offset, count);
-
 		return memberUtil.getSet(members);
+	}
+
+	/**
+	 * 
+	 * 按照分值的排序（降序）
+	 * @param min
+	 * @param max
+	 * @param offset
+	 * @param count
+	 * @param loader
+	 * @param ids
+	 * @return 
+	 */
+	@Override
+	public Set<T> findByScoreDesc(double min, double max, long offset, long count,
+			RedisLoader<List<ZsetResult<T>>> loader, int... ids) {
+		Set<T> result = findByScoreDesc(min, max, offset, count, ids);
+		if (result == null || result.size() < count) {
+			synchronized (BaseZsetRedisDaoImpl.class) {
+				result = findByScoreDesc(min, max, offset, count, ids);
+				if (result == null || result.size() < count) {
+					result = reloadWithOutScore(loader, ids);
+				}
+			}
+		}
+		return result;
 	}
 
 	/**
@@ -165,24 +258,26 @@ public abstract class BaseZsetRedisDaoImpl<T> implements IBaseZsetRedisDao<T>, I
 	}
 
 	/**
-	 * 按照索引查询，
-	 * 并返回分值
+	 * 查询一定区间的值
+	 * 按照值的升序排序
 	 * @param start
 	 * @param end
+	 * @param loader
 	 * @param ids
-	 * @return
-	 *@author BravoZu
+	 * @return 
 	 */
 	@Override
-	public List<ZsetResult<T>> findByIdWithScoresAsc(long start, long end, int... ids) {
-		List<ZsetResult<T>> zsetResults = new ArrayList<ZsetResult<T>>();
-		String key = buildKey(ids);
-		Set<TypedTuple<String>> results = stringRedisTemplate().boundZSetOps(key).rangeWithScores(start, end);
-		for (TypedTuple<String> tt : results) {
-			zsetResults.add(new ZsetResult<T>(memberUtil.getObject(tt.getValue()), tt.getScore()));
+	public Set<T> findByIdAsc(long start, long end, RedisLoader<List<ZsetResult<T>>> loader, int... ids) {
+		Set<T> result = findByIdAsc(start, end, ids);
+		if (result == null) {
+			synchronized (BaseZsetRedisDaoImpl.class) {
+				result = findByIdAsc(start, end, ids);
+				if (result == null) {
+					result = reloadWithOutScore(loader, ids);
+				}
+			}
 		}
-		results = null;
-		return zsetResults;
+		return result;
 	}
 
 	/**
@@ -197,18 +292,91 @@ public abstract class BaseZsetRedisDaoImpl<T> implements IBaseZsetRedisDao<T>, I
 	}
 
 	/**
-	 * 按照分值的顺序排序
+	 * 查询一定区间的值，
+	 * 按照值的倒序排序
+	 * @param start
+	 * @param end
+	 * @param loader
+	 * @param ids
+	 * @return 
+	 */
+	public Set<T> findByIdDesc(long start, long end, RedisLoader<List<ZsetResult<T>>> loader, int... ids) {
+		Set<T> result = findByIdDesc(start, end, ids);
+		if (result == null) {
+			synchronized (BaseZsetRedisDaoImpl.class) {
+				result = findByIdDesc(start, end, ids);
+				if (result == null) {
+					result = reloadWithOutScore(loader, ids);
+				}
+			}
+		}
+		return result;
+	}
+
+	/**
+	 * 按照id查询，结果升序返回
+	 * @param start 下标索引
+	 * @param end 下标索引
+	 * @param ids
+	 * @return
+	 * @author BravoZu
+	 */
+	@Override
+	public List<ZsetResult<T>> findByIdWithScoresAsc(long start, long end, int... ids) {
+		String key = buildKey(ids);
+		Set<TypedTuple<String>> results = stringRedisTemplate().boundZSetOps(key).rangeWithScores(start, end);
+		return resolveSelectResult(results);
+	}
+
+	/**
+	 * 按照id查询，结果升序返回
+	 * @param start
+	 * @param end
+	 * @param loader
+	 * @param ids
+	 * @return 
+	 */
+	@Override
+	public List<ZsetResult<T>> findByIdWithScoresAsc(long start, long end, RedisLoader<List<ZsetResult<T>>> loader,
+			int... ids) {
+		List<ZsetResult<T>> result = findByIdWithScoresAsc(start, end, ids);
+		if (result == null) {
+			synchronized (BaseZsetRedisDaoImpl.class) {
+				result = findByIdWithScoresAsc(start, end, ids);
+				if (result != null) {
+					result = reloadWithScore(loader, ids);
+				}
+			}
+		}
+		return result;
+	}
+
+	/**
+	 * 按照分值的升序排序
 	 */
 	@Override
 	public List<ZsetResult<T>> findByScoreWithScoresAsc(double min, double max, int... ids) {
-		List<ZsetResult<T>> zsetResults = new ArrayList<ZsetResult<T>>();
 		String key = buildKey(ids);
 		Set<TypedTuple<String>> results = stringRedisTemplate().opsForZSet().rangeByScoreWithScores(key, min, max);
-		for (TypedTuple<String> tt : results) {
-			zsetResults.add(new ZsetResult<T>(memberUtil.getObject(tt.getValue()), tt.getScore()));
+		return resolveSelectResult(results);
+	}
+
+	/**
+	 * 按照分值的升序排序
+	 */
+	@Override
+	public List<ZsetResult<T>> findByScoreWithScoresAsc(double min, double max, RedisLoader<List<ZsetResult<T>>> loader,
+			int... ids) {
+		List<ZsetResult<T>> result = findByScoreWithScoresAsc(min, max, ids);
+		if (result == null) {
+			synchronized (BaseZsetRedisDaoImpl.class) {
+				result = findByScoreWithScoresAsc(min, max, ids);
+				if (result == null) {
+					result = reloadWithScore(loader, ids);
+				}
+			}
 		}
-		results = null;
-		return zsetResults;
+		return null;
 	}
 
 	/**
@@ -216,15 +384,33 @@ public abstract class BaseZsetRedisDaoImpl<T> implements IBaseZsetRedisDao<T>, I
 	 */
 	@Override
 	public List<ZsetResult<T>> findByScoreWithScoresDesc(double min, double max, int... ids) {
-		List<ZsetResult<T>> zsetResults = new ArrayList<ZsetResult<T>>();
 		String key = buildKey(ids);
 		Set<TypedTuple<String>> results = stringRedisTemplate().opsForZSet().reverseRangeByScoreWithScores(key, min,
 				max);
-		for (TypedTuple<String> tt : results) {
-			zsetResults.add(new ZsetResult<T>(memberUtil.getObject(tt.getValue()), tt.getScore()));
+		return resolveSelectResult(results);
+	}
+
+	/**
+	 * 按照分值的倒序排序
+	 * @param min
+	 * @param max
+	 * @param loader
+	 * @param ids
+	 * @return 
+	 */
+	@Override
+	public List<ZsetResult<T>> findByScoreWithScoresDesc(double min, double max,
+			RedisLoader<List<ZsetResult<T>>> loader, int... ids) {
+		List<ZsetResult<T>> result = findByScoreWithScoresDesc(min, max, ids);
+		if (result == null) {
+			synchronized (BaseZsetRedisDaoImpl.class) {
+				result = findByScoreWithScoresDesc(min, max, ids);
+				if (result == null) {
+					result = reloadWithScore(loader, ids);
+				}
+			}
 		}
-		results = null;
-		return zsetResults;
+		return result;
 	}
 
 	/**
@@ -234,15 +420,35 @@ public abstract class BaseZsetRedisDaoImpl<T> implements IBaseZsetRedisDao<T>, I
 	 */
 	@Override
 	public List<ZsetResult<T>> findByScoreWithScoresAsc(double min, double max, long offset, long count, int... ids) {
-		List<ZsetResult<T>> zsetResults = new ArrayList<ZsetResult<T>>();
 		String key = buildKey(ids);
 		Set<TypedTuple<String>> results = stringRedisTemplate().opsForZSet().rangeByScoreWithScores(key, min, max,
 				offset, count);
-		for (TypedTuple<String> tt : results) {
-			zsetResults.add(new ZsetResult<T>(memberUtil.getObject(tt.getValue()), tt.getScore()));
+		return resolveSelectResult(results);
+	}
+
+	/**
+	 * 结果升序排序
+	 * @param min score 的小值
+	 * @param max score的大值
+	 * @param offset
+	 * @param count
+	 * @param loader
+	 * @param ids
+	 * @return 
+	 */
+	@Override
+	public List<ZsetResult<T>> findByScoreWithScoresAsc(double min, double max, long offset, long count,
+			RedisLoader<List<ZsetResult<T>>> loader, int... ids) {
+		List<ZsetResult<T>> result = findByScoreWithScoresAsc(min, max, offset, count, ids);
+		if (result == null) {
+			synchronized (BaseZsetRedisDaoImpl.class) {
+				result = findByScoreWithScoresAsc(min, max, offset, count, ids);
+				if (result == null) {
+					result = reloadWithScore(loader, ids);
+				}
+			}
 		}
-		results = null;
-		return zsetResults;
+		return result;
 	}
 
 	/**
@@ -252,15 +458,35 @@ public abstract class BaseZsetRedisDaoImpl<T> implements IBaseZsetRedisDao<T>, I
 	 */
 	@Override
 	public List<ZsetResult<T>> findByScoreWithScoresDesc(double min, double max, long offset, long count, int... ids) {
-		List<ZsetResult<T>> zsetResults = new ArrayList<ZsetResult<T>>();
 		String key = buildKey(ids);
 		Set<TypedTuple<String>> results = stringRedisTemplate().opsForZSet().reverseRangeByScoreWithScores(key, min,
 				max, offset, count);
-		for (TypedTuple<String> tt : results) {
-			zsetResults.add(new ZsetResult<T>(memberUtil.getObject(tt.getValue()), tt.getScore()));
+		return resolveSelectResult(results);
+	}
+
+	/**
+	 * 结果按照score的降序排列
+	 * @param min
+	 * @param max
+	 * @param offset
+	 * @param count
+	 * @param loader
+	 * @param ids
+	 * @return 
+	 */
+	@Override
+	public List<ZsetResult<T>> findByScoreWithScoresDesc(double min, double max, long offset, long count,
+			RedisLoader<List<ZsetResult<T>>> loader, int... ids) {
+		List<ZsetResult<T>> result = findByScoreWithScoresDesc(min, max, offset, count, ids);
+		if (result == null) {
+			synchronized (BaseZsetRedisDaoImpl.class) {
+				result = findByScoreWithScoresDesc(min, max, offset, count, ids);
+				if (result == null) {
+					result = reloadWithScore(loader, ids);
+				}
+			}
 		}
-		results = null;
-		return zsetResults;
+		return result;
 	}
 
 	/**
@@ -403,18 +629,7 @@ public abstract class BaseZsetRedisDaoImpl<T> implements IBaseZsetRedisDao<T>, I
 	@Override
 	public void expire(final long seconds, int... ids) {
 		final String key = buildKey(ids);
-		stringRedisTemplate().execute(new RedisCallback<Boolean>() {
-			@Override
-			public Boolean doInRedis(RedisConnection connection) throws DataAccessException {
-				Boolean flag = false;
-				try {
-					flag = connection.expire(key.getBytes(), seconds);
-				} finally {
-					connection.close();
-				}
-				return flag;
-			}
-		});
+		MethodHelper.expire(stringRedisTemplate(), key, seconds);
 	}
 
 	/**
@@ -503,6 +718,43 @@ public abstract class BaseZsetRedisDaoImpl<T> implements IBaseZsetRedisDao<T>, I
 			return MessageFormat.format(baseKey, builder.toString());
 		}
 
+	}
+
+	private Set<T> reloadWithOutScore(RedisLoader<List<ZsetResult<T>>> loader, int... ids) {
+		Set<T> result = null;
+		List<ZsetResult<T>> zsetResults = reloadWithScore(loader, ids);
+		if (zsetResults != null && zsetResults.size() > 0) {
+			result = Sets.newLinkedHashSet();
+			for (ZsetResult<T> zr : zsetResults) {
+				result.add(zr.getValue());
+			}
+		}
+		return result;
+	}
+
+	private List<ZsetResult<T>> reloadWithScore(RedisLoader<List<ZsetResult<T>>> loader, int... ids) {
+		LoaderResult<List<ZsetResult<T>>> zrs = loader.call();
+		if (zrs.getV() != null) {
+			if (zrs.isCache()) {
+				Collection<SimpleTypeTuple<T>> simpleTypeTuples = Sets.newHashSet();
+				for (ZsetResult<T> zr : zrs.getV()) {
+					simpleTypeTuples.add(new SimpleTypeTuple<T>(zr.getValue(), zr.getScore()));
+				}
+				add(simpleTypeTuples, ids);
+			}
+		}
+		return zrs.getV();
+	}
+
+	private List<ZsetResult<T>> resolveSelectResult(Set<TypedTuple<String>> results) {
+		if (results == null || results.size() == 0) {
+			return null;
+		}
+		List<ZsetResult<T>> zsetResults = Lists.newArrayList();
+		for (TypedTuple<String> tt : results) {
+			zsetResults.add(new ZsetResult<T>(memberUtil.getObject(tt.getValue()), tt.getScore()));
+		}
+		return zsetResults;
 	}
 
 }
