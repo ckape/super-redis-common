@@ -67,6 +67,7 @@ public abstract class TaskQueueSuport<T> implements IRedisOpsTemplate {
 			synchronized (lock) {
 				if (taskThread != null) {
 					taskThread = new Thread(new TaskExecutor());
+					taskThread.setDaemon(true);
 				}
 			}
 		}

@@ -9,7 +9,4 @@ package cn.friday.base.service.global.redis.syncer;
  */
 public interface DatabaseSyncer<T> extends Syncer<T> {
 
-	@Override
-	public void excute(T t);
-
 }

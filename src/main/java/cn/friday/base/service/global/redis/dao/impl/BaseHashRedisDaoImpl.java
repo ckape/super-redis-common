@@ -41,7 +41,7 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 	private boolean isLocalCache;
 
 	/**
-	 * 默认缓存的时间
+	 * 默认缓存的时间,1s
 	 */
 	private final static int DEFAULT_CAHCE_SECOND = 1;
 
@@ -81,8 +81,6 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 	 * 直接从redis获取
 	 * @param id
 	 * @return 
-	 * 2016年5月7日 上午11:52:59
-	 * @author jiangnan.zjn@alibaba-inc.com
 	 */
 	private T doGetById(long id) {
 		String key = MessageFormat.format(baseKey, id + "");
@@ -95,8 +93,6 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 	 * 
 	 * @param id
 	 * @param loader (当redis中不存在时，如何恢复，继承这个抽象类)
-	 * @return 下午7:46:13
-	 * 2016年5月6日
 	 */
 	@Override
 	public T findById(long id, RedisLoader<T> loader) {
@@ -137,6 +133,7 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 	 * @param ids
 	 * @return
 	 */
+	@SuppressWarnings("unchecked")
 	@Override
 	@Deprecated
 	public List<T> multiFindByIds(final List<Long> ids) {
@@ -160,7 +157,6 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 		});
 		List<T> list = new ArrayList<T>();
 		for (Object o : results) {
-			@SuppressWarnings("unchecked")
 			T t = (T) o;
 			list.add(t);
 		}
