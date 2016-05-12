@@ -19,8 +19,6 @@ public abstract class RedisLoader<T> {
 	 * 是否需要缓存
 	 * 
 	 * @return 上午10:44:40
-	 * 2016年5月6日
-	 * @author jiangnan.zjn@alibaba-inc.com
 	 */
 	public abstract boolean isNeedCache(T t);
 
@@ -31,10 +29,6 @@ public abstract class RedisLoader<T> {
 	 * 
 	 * @param t
 	 * @return 0=过期时间为1小时
-	 * 2016年5月6日
-	 * @author jiangnan.zjn@alibaba-inc.com
 	 */
-	public int expire(T t) {
-		return 0;
-	}
+	public abstract int expire(T t);
 }

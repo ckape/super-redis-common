@@ -17,7 +17,7 @@ public class Constant {
 		/**
 		* 一个很大的时间戳
 		*/
-		public final static long MAX_TIME_LONG = 20000000000000l;
+		public final static long MAX_TIME_LONG = 20000000000000L;
 
 	}
 

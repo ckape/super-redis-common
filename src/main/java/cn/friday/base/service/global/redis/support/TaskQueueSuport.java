@@ -55,7 +55,6 @@ public abstract class TaskQueueSuport<T> implements IRedisOpsTemplate {
 		this.entityClazz = entityClazz;
 		createKey();
 		initTaskThread().start();
-		;
 	}
 
 	/**
@@ -65,7 +64,7 @@ public abstract class TaskQueueSuport<T> implements IRedisOpsTemplate {
 	private Thread initTaskThread() {
 		if (taskThread == null) {
 			synchronized (lock) {
-				if (taskThread != null) {
+				if (taskThread == null) {
 					taskThread = new Thread(new TaskExecutor());
 					taskThread.setDaemon(true);
 				}

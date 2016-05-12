@@ -37,7 +37,7 @@ public abstract class AbstractQueueConsumer<T> extends BaseMessageQueue<T> {
 	private Thread initTaskThread() {
 		if (taskThread == null) {
 			synchronized (lock) {
-				if (taskThread != null) {
+				if (taskThread == null) {
 					taskThread = new Thread(new TaskExecutor());
 					taskThread.setDaemon(true);
 				}

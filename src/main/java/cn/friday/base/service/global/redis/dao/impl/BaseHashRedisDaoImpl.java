@@ -4,7 +4,6 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -14,10 +13,6 @@ import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.StringRedisConnection;
 import org.springframework.data.redis.core.RedisCallback;
 
-import com.google.common.base.Splitter;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 
@@ -25,6 +20,7 @@ import cn.friday.base.service.global.redis.dao.IBaseHashRedisDao;
 import cn.friday.base.service.global.redis.dao.IRedisOpsTemplate;
 import cn.friday.base.service.global.redis.loader.LoaderResult;
 import cn.friday.base.service.global.redis.loader.RedisLoader;
+import cn.friday.base.service.global.redis.localcache.AbstractLocalCache;
 import cn.friday.base.service.global.redis.registry.RegistryService;
 import cn.friday.base.service.global.redis.syncer.Syncer;
 import cn.friday.base.service.global.redis.util.Constant;
@@ -48,7 +44,7 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 	//本地缓存时间
 	private int cacheTime;
 
-	private volatile LoadingCache<String, T> cache;
+	private volatile EntityLocalCache cache;
 
 	//对象锁
 	private Object lock = new Object();
@@ -116,10 +112,10 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 				if (t == null) {
 					LoaderResult<T> loaderResult = loader.call();
 					if (loaderResult.getV() != null && loaderResult.isCache()) {
+						t = loaderResult.getV();
 						//缓存对应数据
 						save(t, id, loaderResult.getExpireTime());
 					}
-					t = loaderResult.getV();
 				}
 			}
 
@@ -367,6 +363,14 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 		return stringRedisTemplate().opsForHash().get(key, propertyName);
 	}
 
+	/**
+	 * 
+	 * @param propertyName
+	 * @param id
+	 * @param loader (重新reloader器)
+	 * @return 
+	 */
+	@Override
 	public Object findByProperty(String propertyName, long id, RedisLoader<T> loader) {
 		Object o = null;
 		if (isLocalCache) {
@@ -422,7 +426,7 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 		String key = MessageFormat.format(baseKey, id + "");
 		try {
 			t = initLocalCache().get(key);
-		} catch (ExecutionException e) {
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		return t;
@@ -437,19 +441,11 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 	/**
 	 * 初始化本地缓存
 	 */
-	private LoadingCache<String, T> initLocalCache() {
+	private EntityLocalCache initLocalCache() {
 		if (cache == null) {
 			synchronized (lock) {
 				if (cache == null) {
-					cache = CacheBuilder.newBuilder().expireAfterWrite(getCacheTime(), TimeUnit.SECONDS)
-							.build(new CacheLoader<String, T>() {
-								@Override
-								public T load(String key) throws Exception {
-									List<String> list = Splitter.on(":").omitEmptyStrings().splitToList(key);
-									Long id = Long.parseLong(list.get(list.size() - 1));
-									return reloadData(id);
-								}
-							});
+					cache = new EntityLocalCache(getCacheTime());
 				}
 			}
 		}
@@ -467,10 +463,6 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 			//异步同步数据
 			executorService.execute(new SyncExecutor<T>(syncer, t));
 		}
-	}
-
-	private T reloadData(long id) {
-		return doGetById(id);
 	}
 
 	private long makeId(final String key) {
@@ -526,6 +518,27 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 		String keyName = createKeyName();
 		this.baseKey = new StringBuffer().append(keyName).append(":{0}").toString();
 		RegistryService.registry(baseKey);
+	}
+
+	/**
+	 * 
+	 * <b><code>EntityLocalCache</code></b>
+	 * <p>
+	 * 本地缓存
+	 * </p>
+	 */
+	class EntityLocalCache extends AbstractLocalCache<T> {
+
+		public EntityLocalCache(int second) {
+			super(entityClazz.getSimpleName(), second);
+		}
+
+		@Override
+		public T reloadData(List<String> ids) {
+			System.out.println("重新reload：" + ids);
+			return doGetById(Integer.parseInt(ids.get(ids.size() - 1)));
+		}
+
 	}
 
 }

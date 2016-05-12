@@ -109,6 +109,15 @@ public interface IBaseHashRedisDao<T> {
 	 */
 	public Object findByProperty(String propertyName, long id);
 
+	/**
+	 * 
+	 * @param propertyName
+	 * @param id
+	 * @param loader (重新reloader器)
+	 * @return 
+	 */
+	public Object findByProperty(String propertyName, long id, RedisLoader<T> loader);
+
 	public IBaseRedisMapper<T> getBaseRedisMapper();
 
 	/**
