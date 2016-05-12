@@ -20,8 +20,8 @@ import cn.friday.base.service.global.redis.dao.IBaseHashRedisDao;
 import cn.friday.base.service.global.redis.dao.IRedisOpsTemplate;
 import cn.friday.base.service.global.redis.loader.LoaderResult;
 import cn.friday.base.service.global.redis.loader.RedisLoader;
-import cn.friday.base.service.global.redis.localcache.AbstractLocalCache;
 import cn.friday.base.service.global.redis.registry.RegistryService;
+import cn.friday.base.service.global.redis.support.cache.AbstractLocalCache;
 import cn.friday.base.service.global.redis.syncer.Syncer;
 import cn.friday.base.service.global.redis.util.Constant;
 import cn.friday.base.service.global.redis.util.MethodHelper;
@@ -291,6 +291,23 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 	}
 
 	/**
+	 * 检查key值得过期时间
+	 * 
+	 * @param id
+	 * @return 
+	 */
+	@Override
+	public long ttl(long id) {
+		final String key = MessageFormat.format(baseKey, id + "");
+		return stringRedisTemplate().execute(new RedisCallback<Long>() {
+			@Override
+			public Long doInRedis(RedisConnection connection) throws DataAccessException {
+				return connection.ttl(key.getBytes());
+			}
+		});
+	}
+
+	/**
 	 * 删除对应的id
 	 * @param id
 	 * @return
@@ -535,7 +552,6 @@ public abstract class BaseHashRedisDaoImpl<T> implements IBaseHashRedisDao<T>, I
 
 		@Override
 		public T reloadData(List<String> ids) {
-			System.out.println("重新reload：" + ids);
 			return doGetById(Integer.parseInt(ids.get(ids.size() - 1)));
 		}
 

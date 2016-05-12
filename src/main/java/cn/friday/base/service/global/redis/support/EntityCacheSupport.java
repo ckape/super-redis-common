@@ -5,6 +5,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import java.text.MessageFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -215,13 +216,7 @@ public abstract class EntityCacheSupport<T> extends DynamicFieldHashRedisDao {
 		if (ids.length == 0) {
 			return baseKey.replace(":{0}", "");
 		} else {
-			StringBuilder builder = new StringBuilder();
-			List<Integer> list = new ArrayList<Integer>();
-			for (int i = 0; i < ids.length; i++) {
-				list.add(ids[i]);
-			}
-			Joiner.on(":").appendTo(builder, list);
-			return MessageFormat.format(baseKey, builder.toString());
+			return MessageFormat.format(baseKey, Joiner.on(":").skipNulls().join(Arrays.asList(ids)));
 		}
 	}
 

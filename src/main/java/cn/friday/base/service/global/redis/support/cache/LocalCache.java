@@ -1,4 +1,4 @@
-package cn.friday.base.service.global.redis.localcache;
+package cn.friday.base.service.global.redis.support.cache;
 
 public interface LocalCache<K, V> {
 

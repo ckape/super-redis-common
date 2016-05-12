@@ -86,6 +86,14 @@ public interface IBaseHashRedisDao<T> {
 
 	public boolean exists(long id);
 
+	/**
+	 * 检查key值得过期时间
+	 * 
+	 * @param id
+	 * @return 
+	 */
+	public long ttl(long id);
+
 	public long deleteById(long id);
 
 	public long updateByProperty(String propertyName, Object value, long id);

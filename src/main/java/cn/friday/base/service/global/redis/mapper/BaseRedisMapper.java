@@ -111,79 +111,7 @@ public class BaseRedisMapper<T> extends BeanUtilsHashMapper<T> implements IBaseR
 			}
 		}
 
-		//		Field [] fields = object.getClass().getDeclaredFields();
-		//		
-		//		for(Field field:fields){
-		//			String fieldName = field.getName();
-		//			String value = map.get(fieldName) ;
-		//			
-		//			if(value != null){
-		//				System.out.println(fieldName+"---typeName---"+field.getType().getName());
-		//				if( "java.util.Date".equals(field.getType().getName()) ){
-		//					System.out.println("----***8----");
-		//					Object o;
-		//					try {
-		//						o = invokeGetterMethod(object, fieldName, null, field.getType());
-		//						if(o instanceof Date){
-		//							value = DateUtil.formateDate((Date)o);
-		//						}
-		//					} catch (Exception e) {
-		//						e.printStackTrace();
-		//					}
-		//				}
-		//				targetMap.put(fieldName, value);
-		//			}
-		//			
-		//			
-		//		}
-
-		//		for(String key:map.keySet()){
-		//			String value = map.get(key) ;
-		//			if(value != null){
-		//				targetMap.put(key, value);
-		//			}
-		//		}
 		return targetMap;
-	}
-
-	/**
-	 * 调用get方法
-	 * @param owner
-	 * @param methodName
-	 * @param args
-	 * @param type
-	 * @return
-	 * @throws Exception
-	 */
-	private Object invokeGetterMethod(Object owner, String methodName, Object[] args, Class<?> type) throws Exception {
-
-		Method method = null;
-		try {
-			if (type == boolean.class) {
-				method = owner.getClass().getMethod(isBoolean(methodName));
-			} else {
-				method = owner.getClass().getMethod(getter(methodName));
-			}
-		} catch (SecurityException e) {
-		} catch (NoSuchMethodException e) {
-			return " can't find 'get" + methodName + "' method";
-		}
-		return method.invoke(owner);
-	}
-
-	private static String isBoolean(String name) {
-		if (name.startsWith("is")) {
-			return name;
-		}
-		return "is" + transName(name);
-	}
-
-	private static String getter(String name) {
-		return "get" + transName(name);
-	}
-
-	private static String transName(String name) {
-		return name.substring(0, 1).toUpperCase() + name.substring(1);
 	}
 
 	private static final String rexp = "[0-9]*";

@@ -19,6 +19,21 @@ public class Constant {
 		*/
 		public final static long MAX_TIME_LONG = 20000000000000L;
 
+		/**
+		 * ttl value = 2 key不存在
+		 */
+		public final static long TTL_VALUE_KEY_NOT_EXIST = -2;
+
+		/**
+		 * ttl value = -1 key永不过期
+		 */
+		public final static long TTL_VALUE__NEVER_EXPIRES_KEY = -1;
+
+		/**
+		 * 关闭防雪崩
+		 */
+		public final static long AVALANCHE_CLOSED = -1;
+
 	}
 
 }
